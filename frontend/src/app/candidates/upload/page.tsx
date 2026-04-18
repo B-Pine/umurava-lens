@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { fetchJobs } from '../../../store/jobsSlice';
-import { uploadCandidates } from '../../../store/candidatesSlice';
+import { uploadCandidateFiles } from '../../../store/candidatesSlice';
 
 interface QueueItem {
   name: string;
@@ -14,7 +14,6 @@ interface QueueItem {
 export default function CandidateUploadPage() {
   const dispatch = useAppDispatch();
   const { jobs } = useAppSelector((s) => s.jobs);
-  const { uploading } = useAppSelector((s) => s.candidates);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -29,51 +28,37 @@ export default function CandidateUploadPage() {
     }
   }, [jobs, selectedJobId]);
 
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
-    const newItems: QueueItem[] = Array.from(files).map((f) => ({
+  const handleFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    const newItems: QueueItem[] = fileArray.map((f) => ({
       name: f.name,
-      status: 'waiting' as const,
-      progress: 0,
+      status: 'parsing' as const,
+      progress: 30,
     }));
-    setQueue((prev) => [...prev, ...newItems]);
+    setQueue(newItems);
 
-    // Simulate processing for demo
-    newItems.forEach((item, i) => {
-      setTimeout(() => {
-        setQueue((prev) =>
-          prev.map((q) => q.name === item.name ? { ...q, status: 'parsing', progress: 30 } : q)
+    try {
+      const result: any = await dispatch(
+        uploadCandidateFiles({ files: fileArray, jobId: selectedJobId })
+      ).unwrap();
+      setQueue((prev) => prev.map((q) => ({ ...q, status: 'done' as const, progress: 100 })));
+      dispatch(fetchJobs({ limit: 50 }));
+      const failed: { file: string; reason: string }[] = result?.failed || [];
+      if (failed.length > 0) {
+        alert(
+          `${result.message}\n\nFailed files:\n` +
+            failed.map((f) => `• ${f.file}: ${f.reason}`).join('\n')
         );
-      }, i * 2000 + 500);
-      setTimeout(() => {
-        setQueue((prev) =>
-          prev.map((q) => q.name === item.name ? { ...q, status: 'analyzing', progress: 65 } : q)
-        );
-      }, i * 2000 + 2000);
-      setTimeout(() => {
-        setQueue((prev) =>
-          prev.map((q) => q.name === item.name ? { ...q, status: 'done', progress: 100 } : q)
-        );
-      }, i * 2000 + 4000);
-    });
-  }, []);
-
-  const handleUploadJSON = async () => {
-    // Demo: upload sample candidates via JSON
-    const sampleCandidates = [
-      {
-        fullName: 'Alex Chen',
-        email: 'alex.chen@email.com',
-        location: 'San Francisco, CA',
-        currentTitle: 'ML Engineer',
-        currentCompany: 'TechCorp',
-        skills: ['Python', 'PyTorch', 'TensorFlow', 'MLOps'],
-        yearsOfExperience: 5,
-        summary: 'ML engineer with strong background in deep learning and deployment.',
-      },
-    ];
-    await dispatch(uploadCandidates({ candidates: sampleCandidates, jobId: selectedJobId }));
-  };
+      } else {
+        alert('Files parsed and candidates uploaded successfully!');
+      }
+      window.location.href = `/jobs/${selectedJobId}`;
+    } catch (error: any) {
+      alert('Failed to upload files: ' + error.message);
+      setQueue([]);
+    }
+  }, [dispatch, selectedJobId]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 px-4">
@@ -135,15 +120,6 @@ export default function CandidateUploadPage() {
               </label>
             </div>
           </div>
-
-          {/* Upload JSON button for demo */}
-          <button
-            onClick={handleUploadJSON}
-            disabled={uploading || !selectedJobId}
-            className="w-full py-3 bg-ai-gradient text-white rounded-xl font-bold disabled:opacity-50 transition-all"
-          >
-            {uploading ? 'Uploading...' : 'Upload Sample Candidate (Demo)'}
-          </button>
 
           {/* Processing Queue */}
           <div className="bg-surface-container-low rounded-xl overflow-hidden">

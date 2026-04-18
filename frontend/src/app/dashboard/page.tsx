@@ -65,16 +65,19 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-on-primary-container text-xs uppercase tracking-widest font-bold">Average Match Score</p>
                   <h3 className="text-5xl font-extrabold text-white mt-2">
-                    {stats?.averageMatchScore ?? 84.2}<span className="text-lg opacity-50 ml-1">%</span>
+                    {stats?.averageMatchScore != null ? (
+                      <>{stats.averageMatchScore}<span className="text-lg opacity-50 ml-1">%</span></>
+                    ) : (
+                      <span className="text-2xl opacity-70">No screenings yet</span>
+                    )}
                   </h3>
                 </div>
-                <div className="mt-4 flex items-center gap-4">
-                  <div className="flex -space-x-3">
-                    <div className="w-8 h-8 rounded-full border-2 border-primary-container bg-secondary flex items-center justify-center text-white text-xs font-bold">S</div>
-                    <div className="w-8 h-8 rounded-full border-2 border-primary-container bg-secondary-container flex items-center justify-center text-white text-xs font-bold">J</div>
-                    <div className="w-8 h-8 rounded-full border-2 border-primary-container bg-on-tertiary-container flex items-center justify-center text-white text-xs font-bold">M</div>
-                  </div>
-                  <p className="text-on-primary-container text-xs">Based on 450 recent matches</p>
+                <div className="mt-4">
+                  <p className="text-on-primary-container text-xs">
+                    {stats?.averageMatchCount
+                      ? `Average across ${stats.averageMatchCount} AI screening${stats.averageMatchCount === 1 ? '' : 's'}`
+                      : 'Run screening on a job to populate this metric'}
+                  </p>
                 </div>
               </div>
               <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-secondary/30 blur-[100px] rounded-full" />
@@ -105,11 +108,7 @@ export default function DashboardPage() {
                 <CardSkeleton />
               </>
             ) : (
-              (stats?.recentJobs ?? [
-                { _id: '1', title: 'Senior AI Engineer', location: 'San Francisco', employmentType: 'Full-time', salaryRange: '$180k - $240k', applicantCount: 142, screenedCount: 110, shortlistedCount: 28, status: 'active' },
-                { _id: '2', title: 'Product Design Director', location: 'Remote', employmentType: 'Contract', salaryRange: '$120/hr', applicantCount: 85, screenedCount: 36, shortlistedCount: 12, status: 'active' },
-                { _id: '3', title: 'Backend Lead (Node.js)', location: 'Hybrid', employmentType: 'Full-time', salaryRange: '$160k - $210k', applicantCount: 214, screenedCount: 32, shortlistedCount: 8, status: 'active' },
-              ]).map((job: any) => {
+              (stats?.recentJobs || []).map((job: any) => {
                 const progress = job.applicantCount > 0 ? Math.round((job.screenedCount / job.applicantCount) * 100) : 0;
                 return (
                   <div key={job._id} className="bg-surface-container-lowest p-5 rounded-xl transition-all hover:shadow-md">
@@ -166,33 +165,45 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Top Talent Highlights */}
+          {/* Top Talent Highlights (from screening results) */}
           <section className="space-y-4">
             <h2 className="text-xl font-extrabold text-on-surface">Top Talent Highlights</h2>
-            <div className="space-y-3">
-              {[
-                { name: 'Marcus Thorne', role: 'Senior Backend Lead', score: 98, initials: 'MT' },
-                { name: 'Elena Rodriguez', role: 'AI Research Lead', score: 96, initials: 'ER' },
-                { name: 'David Chen', role: 'Full Stack Developer', score: 94, initials: 'DC' },
-              ].map((talent) => (
-                <div key={talent.name} className="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 border-l-4 border-secondary">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-secondary to-secondary-container flex items-center justify-center text-white font-bold text-sm">
-                    {talent.initials}
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="text-sm font-bold text-on-surface">{talent.name}</h5>
-                    <p className="text-[10px] text-on-surface-variant uppercase">{talent.role}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-secondary font-extrabold text-lg">{talent.score}</div>
-                    <div className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest">SCORE</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button className="w-full py-3 text-sm font-bold text-on-surface-variant hover:text-secondary transition-colors text-center bg-surface-container-low rounded-lg">
-              Analyze More Matches
-            </button>
+            {stats?.topTalents && stats.topTalents.length > 0 ? (
+              <div className="space-y-3">
+                {stats.topTalents.map((talent) => {
+                  const initials = talent.name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
+                  return (
+                    <Link
+                      key={talent._id}
+                      href={`/jobs/${talent.jobId}/shortlist`}
+                      className="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 border-l-4 border-secondary hover:shadow-md transition-all"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-linear-to-br from-secondary to-secondary-container flex items-center justify-center text-white font-bold text-sm">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h5 className="text-sm font-bold text-on-surface truncate">{talent.name}</h5>
+                        <p className="text-[10px] text-on-surface-variant uppercase truncate">{talent.role}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-secondary font-extrabold text-lg">{talent.score}</div>
+                        <div className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest">SCORE</div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-surface-container-lowest p-6 rounded-xl text-center text-sm text-on-surface-variant">
+                <span className="material-symbols-outlined text-3xl text-on-surface-variant/60 mb-2 block">insights</span>
+                No screened candidates yet. Run AI screening on a job to see top talent here.
+              </div>
+            )}
           </section>
         </aside>
       </div>

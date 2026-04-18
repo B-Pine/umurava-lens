@@ -13,7 +13,7 @@ export interface ICandidate extends Document {
   education: {
     degree: string;
     institution: string;
-    year: number;
+    year: string;
   }[];
   experience: {
     title: string;
@@ -52,7 +52,7 @@ const CandidateSchema = new Schema<ICandidate>(
       {
         degree: { type: String },
         institution: { type: String },
-        year: { type: Number },
+        year: { type: String, default: '' },
       },
     ],
     experience: [

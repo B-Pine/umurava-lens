@@ -25,11 +25,23 @@ export interface Job {
   updatedAt: string;
 }
 
+export interface TopTalent {
+  _id: string;
+  candidateId: string;
+  jobId: string;
+  name: string;
+  role: string;
+  score: number;
+  recommendation: 'hire' | 'consider' | 'risky';
+}
+
 interface DashboardStats {
   activeJobCount: number;
   candidatesScreened: number;
-  averageMatchScore: number;
+  averageMatchScore: number | null;
+  averageMatchCount: number;
   recentJobs: Job[];
+  topTalents: TopTalent[];
 }
 
 interface JobsState {

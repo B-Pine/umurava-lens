@@ -65,7 +65,7 @@ const candidatesForAIJob = [
     summary: 'World-class AI researcher with 12 years in ML/AI. Led deployment of 5+ enterprise-scale LLM ecosystems at Fortune 500 firms. Strong patent portfolio in generative video synthesis.',
     skills: ['Python', 'PyTorch', 'TensorFlow', 'LLM Fine-tuning', 'Neural Architecture Search', 'Distributed Architecture', 'Vector DBs', 'CUDA', 'Kubernetes'],
     yearsOfExperience: 12,
-    education: [{ degree: 'PhD Computer Science', institution: 'Stanford University', year: 2014 }],
+    education: [{ degree: 'PhD Computer Science', institution: 'Stanford University', year: '2014' }],
     experience: [
       { title: 'Principal Scientist', company: 'DeepTech AI', startDate: '2021', endDate: 'Present', description: 'Leading a team of 15+ engineers building next-gen LLM products.' },
       { title: 'Senior ML Engineer', company: 'Google Brain', startDate: '2017', endDate: '2021', description: 'Developed transformer-based architectures for NLP tasks.' },
@@ -88,7 +88,7 @@ const candidatesForAIJob = [
     summary: 'Exceptional MLOps track record with 9 years in the field. Reduced deployment latency by 40% at TechNext. Specializes in cost-efficient scaling for mid-market cloud infrastructures.',
     skills: ['Python', 'TensorFlow', 'Distributed Computing', 'MLOps', 'Kubernetes', 'Spark', 'Go'],
     yearsOfExperience: 9,
-    education: [{ degree: 'MS Computer Science', institution: 'MIT', year: 2016 }],
+    education: [{ degree: 'MS Computer Science', institution: 'MIT', year: '2016' }],
     experience: [
       { title: 'Senior ML Lead', company: 'FinCore Systems', startDate: '2020', endDate: 'Present', description: 'Architecting ML infrastructure for real-time financial predictions.' },
       { title: 'ML Engineer', company: 'TechNext', startDate: '2016', endDate: '2020', description: 'Reduced deployment latency by 40% and built scalable ML pipelines.' },
@@ -110,7 +110,7 @@ const candidatesForAIJob = [
     summary: 'AI architect specializing in medical AI and ethical AI practices. 7 years of experience building AI systems for healthcare.',
     skills: ['Python', 'PyTorch', 'Ethical AI', 'Medical AI', 'NLP', 'Computer Vision'],
     yearsOfExperience: 7,
-    education: [{ degree: 'MS Artificial Intelligence', institution: 'University of Toronto', year: 2018 }],
+    education: [{ degree: 'MS Artificial Intelligence', institution: 'University of Toronto', year: '2018' }],
     experience: [
       { title: 'AI Architect', company: 'NextGen Health', startDate: '2019', endDate: 'Present', description: 'Designing AI systems for medical diagnostics and patient care.' },
       { title: 'ML Engineer', company: 'HealthTech Labs', startDate: '2018', endDate: '2019', description: 'Built NLP models for clinical document processing.' },
@@ -132,7 +132,7 @@ const candidatesForAIJob = [
     summary: 'Independent AI researcher with interesting papers but limited industry experience. Frequent job changes in the past 2 years.',
     skills: ['Python', 'R', 'Statistical Modeling', 'Bayesian Methods', 'Julia'],
     yearsOfExperience: 4,
-    education: [{ degree: 'PhD Mathematics', institution: 'Humboldt University', year: 2021 }],
+    education: [{ degree: 'PhD Mathematics', institution: 'Humboldt University', year: '2021' }],
     experience: [
       { title: 'Research Scientist', company: 'AI Lab Berlin', startDate: '2023', endDate: '2024', description: 'Published papers on Bayesian deep learning.' },
       { title: 'Data Scientist', company: 'StartupX', startDate: '2022', endDate: '2023', description: 'Built basic ML models for recommendation systems.' },

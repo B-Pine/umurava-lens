@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import Job from '../models/Job';
+import Candidate from '../models/Candidate';
+import ScreeningResult from '../models/ScreeningResult';
 
 export const createJob = async (req: Request, res: Response) => {
   try {
@@ -62,8 +64,13 @@ export const updateJob = async (req: Request, res: Response) => {
 
 export const deleteJob = async (req: Request, res: Response) => {
   try {
-    const job = await Job.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    const job = await Job.findByIdAndDelete(id);
     if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    await ScreeningResult.deleteMany({ jobId: id });
+    await Candidate.updateMany({ jobId: id }, { $set: { jobId: null } });
+
     res.json({ message: 'Job deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -72,19 +79,43 @@ export const deleteJob = async (req: Request, res: Response) => {
 
 export const getDashboardStats = async (_req: Request, res: Response) => {
   try {
-    const [activeJobs, totalScreened, recentJobs] = await Promise.all([
+    const [activeJobs, totalScreened, recentJobs, scoreAgg, topResults] = await Promise.all([
       Job.countDocuments({ status: 'active' }),
       Job.aggregate([{ $group: { _id: null, total: { $sum: '$screenedCount' } } }]),
       Job.find({ status: 'active' }).sort({ updatedAt: -1 }).limit(3),
+      ScreeningResult.aggregate([
+        { $group: { _id: null, avg: { $avg: '$score' }, count: { $sum: 1 } } },
+      ]),
+      ScreeningResult.find()
+        .sort({ score: -1 })
+        .limit(5)
+        .populate('candidateId', 'fullName currentTitle')
+        .populate('jobId', 'title'),
     ]);
 
     const screened = totalScreened.length > 0 ? totalScreened[0].total : 0;
+    const averageMatchScore = scoreAgg.length > 0 ? Math.round(scoreAgg[0].avg * 10) / 10 : null;
+    const averageMatchCount = scoreAgg.length > 0 ? scoreAgg[0].count : 0;
+
+    const topTalents = topResults
+      .filter((r: any) => r.candidateId)
+      .map((r: any) => ({
+        _id: r._id,
+        candidateId: r.candidateId?._id,
+        jobId: r.jobId?._id,
+        name: r.candidateId?.fullName || 'Unknown',
+        role: r.candidateId?.currentTitle || r.jobId?.title || '',
+        score: r.score,
+        recommendation: r.recommendation,
+      }));
 
     res.json({
       activeJobCount: activeJobs,
       candidatesScreened: screened,
-      averageMatchScore: 84.2,
+      averageMatchScore,
+      averageMatchCount,
       recentJobs,
+      topTalents,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

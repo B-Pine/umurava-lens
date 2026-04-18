@@ -39,14 +39,55 @@ export default function CreateJobPage() {
     setSkills(skills.filter((s) => s !== skill));
   };
 
+  const step1Errors = {
+    title: !title.trim() ? 'Job title is required' : '',
+    description: !description.trim() ? 'Job description is required' : '',
+    location: !location.trim() ? 'Location is required' : '',
+    salaryRange: !salaryRange.trim() ? 'Salary range is required' : '',
+  };
+  const step3Errors = {
+    skills: skills.length === 0 ? 'Add at least one required skill' : '',
+  };
+  const step1Valid = Object.values(step1Errors).every((e) => !e);
+  const step3Valid = Object.values(step3Errors).every((e) => !e);
+  const [showErrors, setShowErrors] = useState(false);
+
+  const handleNext = () => {
+    if (step === 1 && !step1Valid) {
+      setShowErrors(true);
+      return;
+    }
+    setShowErrors(false);
+    setStep(step + 1);
+  };
+
   const handleSubmit = async (asDraft: boolean) => {
+    if (asDraft) {
+      if (!title.trim()) {
+        setShowErrors(true);
+        setStep(1);
+        alert('A job title is required to save a draft.');
+        return;
+      }
+    } else {
+      if (!step1Valid) {
+        setShowErrors(true);
+        setStep(1);
+        return;
+      }
+      if (!step3Valid) {
+        setShowErrors(true);
+        setStep(3);
+        return;
+      }
+    }
     setSaving(true);
     try {
       await dispatch(createJob({
-        title,
+        title: title.trim(),
         department,
         employmentType,
-        description,
+        description: description.trim() || (asDraft ? '(draft — description pending)' : description),
         location,
         salaryRange,
         experienceLevel,
@@ -55,8 +96,8 @@ export default function CreateJobPage() {
         aiWeights: weights,
       })).unwrap();
       router.push('/jobs');
-    } catch {
-      alert('Failed to create job');
+    } catch (err: any) {
+      alert('Failed to create job: ' + (err?.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -90,7 +131,14 @@ export default function CreateJobPage() {
               ].map((s) => (
                 <div key={s.num}>
                   <button
-                    onClick={() => setStep(s.num)}
+                    onClick={() => {
+                      if (s.num > 1 && !step1Valid) {
+                        setShowErrors(true);
+                        setStep(1);
+                        return;
+                      }
+                      setStep(s.num);
+                    }}
                     className={`flex items-center gap-4 group w-full text-left ${s.num > step ? 'opacity-50' : ''}`}
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
@@ -138,13 +186,14 @@ export default function CreateJobPage() {
               </div>
               <div className="grid grid-cols-2 gap-8">
                 <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Internal Job Title</label>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Internal Job Title <span className="text-error">*</span></label>
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full bg-surface border-none rounded-lg py-4 px-5 text-lg font-bold focus:ring-2 focus:ring-secondary/30 placeholder:text-surface-variant"
+                    className={`w-full bg-surface border-none rounded-lg py-4 px-5 text-lg font-bold focus:ring-2 focus:ring-secondary/30 placeholder:text-surface-variant ${showErrors && step1Errors.title ? 'ring-2 ring-error' : ''}`}
                     placeholder="e.g. Senior AI Research Engineer"
                   />
+                  {showErrors && step1Errors.title && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.title}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-on-surface-variant mb-2">Department</label>
@@ -164,22 +213,35 @@ export default function CreateJobPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Location</label>
-                  <input value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30" placeholder="e.g. San Francisco, Remote" />
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Location <span className="text-error">*</span></label>
+                  <input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className={`w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30 ${showErrors && step1Errors.location ? 'ring-2 ring-error' : ''}`}
+                    placeholder="e.g. San Francisco, Remote"
+                  />
+                  {showErrors && step1Errors.location && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.location}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Salary Range</label>
-                  <input value={salaryRange} onChange={(e) => setSalaryRange(e.target.value)} className="w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30" placeholder="e.g. $180k - $240k" />
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Salary Range <span className="text-error">*</span></label>
+                  <input
+                    value={salaryRange}
+                    onChange={(e) => setSalaryRange(e.target.value)}
+                    className={`w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30 ${showErrors && step1Errors.salaryRange ? 'ring-2 ring-error' : ''}`}
+                    placeholder="e.g. $180k - $240k"
+                  />
+                  {showErrors && step1Errors.salaryRange && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.salaryRange}</p>}
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Comprehensive Job Narrative</label>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Comprehensive Job Narrative <span className="text-error">*</span></label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full bg-surface border-none rounded-lg py-4 px-5 focus:ring-2 focus:ring-secondary/30"
+                    className={`w-full bg-surface border-none rounded-lg py-4 px-5 focus:ring-2 focus:ring-secondary/30 ${showErrors && step1Errors.description ? 'ring-2 ring-error' : ''}`}
                     placeholder="Describe the mission, the impact, and the day-to-day excellence required..."
                     rows={6}
                   />
+                  {showErrors && step1Errors.description && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.description}</p>}
                 </div>
               </div>
             </section>
@@ -232,8 +294,8 @@ export default function CreateJobPage() {
                 <h3 className="text-xl font-bold">Section 3: Mandatory Stack</h3>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-on-surface-variant mb-4">Required Technical Proficiencies</label>
-                <div className="flex flex-wrap gap-2 p-4 bg-surface rounded-xl border-2 border-dashed border-outline-variant/20 mb-4">
+                <label className="block text-sm font-semibold text-on-surface-variant mb-4">Required Technical Proficiencies <span className="text-error">*</span></label>
+                <div className={`flex flex-wrap gap-2 p-4 bg-surface rounded-xl border-2 border-dashed mb-4 ${showErrors && step3Errors.skills ? 'border-error' : 'border-outline-variant/20'}`}>
                   {skills.map((skill) => (
                     <span key={skill} className="flex items-center gap-2 bg-secondary text-white px-3 py-1.5 rounded-lg text-sm font-semibold">
                       {skill}
@@ -250,6 +312,7 @@ export default function CreateJobPage() {
                     placeholder="Type and press Enter..."
                   />
                 </div>
+                {showErrors && step3Errors.skills && <p className="text-error text-xs mb-2 font-semibold">{step3Errors.skills}</p>}
                 <div className="flex gap-4">
                   <p className="text-xs text-on-surface-variant">Recommended:</p>
                   <div className="flex gap-2">
@@ -266,13 +329,22 @@ export default function CreateJobPage() {
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-8 border-t border-surface-container">
-            <button onClick={() => handleSubmit(true)} disabled={saving} className="flex items-center gap-2 text-on-surface-variant font-semibold hover:text-primary transition-colors">
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={saving || !title.trim()}
+              title={!title.trim() ? 'Enter a job title to save a draft' : 'Save current progress as a draft'}
+              className="flex items-center gap-2 text-on-surface-variant font-semibold hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined">save</span>
-              Save Draft
+              {saving ? 'Saving...' : 'Save Draft'}
             </button>
             <div className="flex gap-4">
               {step < 3 ? (
-                <button onClick={() => setStep(step + 1)} className="px-10 py-3 bg-ai-gradient text-white rounded-lg font-bold shadow-lg shadow-secondary/30 flex items-center gap-2">
+                <button
+                  onClick={handleNext}
+                  disabled={step === 1 && !step1Valid}
+                  className="px-10 py-3 bg-ai-gradient text-white rounded-lg font-bold shadow-lg shadow-secondary/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Next Step
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </button>
@@ -283,7 +355,7 @@ export default function CreateJobPage() {
                   </button>
                   <button
                     onClick={() => handleSubmit(false)}
-                    disabled={saving || !title || !description}
+                    disabled={saving || !step1Valid || !step3Valid}
                     className="px-10 py-3 bg-ai-gradient text-white rounded-lg font-bold shadow-lg shadow-secondary/30 flex items-center gap-2 disabled:opacity-50"
                   >
                     {saving ? 'Saving...' : 'Review & Post Job'}

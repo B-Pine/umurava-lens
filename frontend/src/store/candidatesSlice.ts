@@ -41,9 +41,27 @@ const initialState: CandidatesState = {
 
 export const fetchCandidates = createAsyncThunk(
   'candidates/fetchCandidates',
-  async (params: { jobId?: string; page?: number } = {}) => {
+  async (
+    params: { jobId?: string; page?: number; dateFrom?: string; dateTo?: string; search?: string; limit?: number } = {}
+  ) => {
     const res = await api.get('/candidates', { params });
     return res.data;
+  }
+);
+
+export const deleteCandidate = createAsyncThunk(
+  'candidates/deleteCandidate',
+  async (id: string) => {
+    await api.delete(`/candidates/${id}`);
+    return id;
+  }
+);
+
+export const deleteCandidatesBulk = createAsyncThunk(
+  'candidates/deleteCandidatesBulk',
+  async (ids: string[]) => {
+    await api.delete('/candidates', { data: { ids } });
+    return ids;
   }
 );
 
@@ -51,6 +69,19 @@ export const uploadCandidates = createAsyncThunk(
   'candidates/uploadCandidates',
   async (data: { candidates: Partial<Candidate>[]; jobId?: string }) => {
     const res = await api.post('/candidates/upload', data);
+    return res.data;
+  }
+);
+
+export const uploadCandidateFiles = createAsyncThunk(
+  'candidates/uploadFiles',
+  async (data: { files: File[]; jobId?: string }) => {
+    const formData = new FormData();
+    if (data.jobId) formData.append('jobId', data.jobId);
+    data.files.forEach(f => formData.append('files', f));
+    const res = await api.post('/candidates/upload/files', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   }
 );
@@ -73,7 +104,22 @@ const candidatesSlice = createSlice({
         state.uploading = false;
         state.candidates = [...action.payload.candidates, ...state.candidates];
       })
-      .addCase(uploadCandidates.rejected, (state, action) => { state.uploading = false; state.error = action.error.message || 'Upload failed'; });
+      .addCase(uploadCandidates.rejected, (state, action) => { state.uploading = false; state.error = action.error.message || 'Upload failed'; })
+      .addCase(uploadCandidateFiles.pending, (state) => { state.uploading = true; state.error = null; })
+      .addCase(uploadCandidateFiles.fulfilled, (state, action) => {
+        state.uploading = false;
+        state.candidates = [...action.payload.candidates, ...state.candidates];
+      })
+      .addCase(uploadCandidateFiles.rejected, (state, action) => { state.uploading = false; state.error = action.error.message || 'File Upload failed'; })
+      .addCase(deleteCandidate.fulfilled, (state, action) => {
+        state.candidates = state.candidates.filter((c) => c._id !== action.payload);
+        state.total = Math.max(0, state.total - 1);
+      })
+      .addCase(deleteCandidatesBulk.fulfilled, (state, action) => {
+        const ids = new Set(action.payload);
+        state.candidates = state.candidates.filter((c) => !ids.has(c._id));
+        state.total = Math.max(0, state.total - action.payload.length);
+      });
   },
 });
 

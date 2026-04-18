@@ -2,6 +2,37 @@ import { getGeminiClient } from '../config/gemini';
 import { IJob } from '../models/Job';
 import { ICandidate } from '../models/Candidate';
 
+function extractJson(raw: string): any {
+  let text = raw.trim();
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fence) text = fence[1].trim();
+  const start = text.search(/[{[]/);
+  if (start === -1) throw new Error('No JSON object found in Gemini response');
+  const open = text[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  let end = -1;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end === -1) throw new Error('Unbalanced JSON in Gemini response');
+  return JSON.parse(text.slice(start, end + 1));
+}
+
 interface CandidateScreeningOutput {
   candidateId: string;
   score: number;
@@ -62,7 +93,7 @@ export async function screenCandidates(
 ): Promise<ScreeningResponse> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-flash-latest',
     generationConfig: {
       temperature: 0.1,
       topP: 0.8,
@@ -153,4 +184,43 @@ Return ONLY valid JSON. Sort candidates array by rank ascending (best first).`;
   }
 
   return parsed;
+}
+
+export async function extractCandidateFromCV(text: string): Promise<any> {
+  const model = getGeminiClient().getGenerativeModel({
+    model: 'gemini-flash-latest',
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+
+  const prompt = `You are an expert Talent Acquisition AI.
+Extract candidate information from the following CV text.
+Return the result strictly as a valid JSON object matching this schema:
+{
+  "fullName": "string",
+  "email": "string",
+  "phone": "string",
+  "location": "string",
+  "currentTitle": "string",
+  "currentCompany": "string",
+  "skills": ["string"],
+  "yearsOfExperience": number,
+  "summary": "string",
+  "links": ["string"],
+  "education": [{"degree": "string", "institution": "string", "year": "string"}],
+  "experience": [{"title": "string", "company": "string", "startDate": "string", "endDate": "string", "achievements": ["string"]}]
+}
+Fill in fields based on the text. For missing data, use empty strings/arrays, or 0. Make sure to guess the yearsOfExperience accurately based on job durations.
+
+CV TEXT:
+${text.substring(0, 30000)}
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    return extractJson(responseText);
+  } catch (error: any) {
+    console.error('Gemini Parse CV Error:', error);
+    throw new Error('Failed to parse CV cleanly.');
+  }
 }
