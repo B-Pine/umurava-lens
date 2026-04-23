@@ -1,45 +1,64 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 import Job from './models/Job';
 import Candidate from './models/Candidate';
 import ScreeningResult from './models/ScreeningResult';
+import User from './models/User';
 
 dotenv.config();
+
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@umurava.africa';
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'umurava-admin-2026';
+const ADMIN_NAME = process.env.SEED_ADMIN_NAME || 'Umurava Admin';
 
 const jobs = [
   {
     title: 'Senior AI Research Engineer',
-    description: 'Lead our R&D efforts in large-scale transformer models and reinforcement learning architectures. You will drive the design and implementation of production-grade ML systems.',
+    description:
+      'Lead our R&D efforts in large-scale transformer models and reinforcement learning architectures. You will drive the design and implementation of production-grade ML systems.',
     department: 'Engineering & Data Science',
     employmentType: 'Full-time Permanent',
-    location: 'San Francisco',
-    salaryRange: '$180k - $240k',
+    location: 'Kigali, Rwanda (Remote-friendly)',
+    salaryRange: '$80k - $120k',
     requiredSkills: ['Python', 'PyTorch', 'Transformers', 'LLM Finetuning', 'Vector DBs'],
     experienceLevel: 'Senior',
     status: 'active' as const,
-    aiWeights: { technicalSkills: 85, yearsOfExperience: 40, educationCredentials: 25, pastProjectImpact: 70 },
-    applicantCount: 142,
-    shortlistedCount: 28,
-    screenedCount: 110,
+    aiWeights: {
+      technicalSkills: 85,
+      yearsOfExperience: 40,
+      educationCredentials: 25,
+      pastProjectImpact: 70,
+    },
+    passingScore: 70,
+    shortlistCap: 20 as const,
+    applicationDeadline: '2026-06-30',
   },
   {
     title: 'Backend Lead',
-    description: 'Scale our high-throughput distributed services. Architecture ownership of core API infrastructure. Build reliable systems serving millions of requests.',
+    description:
+      'Scale our high-throughput distributed services. Architecture ownership of core API infrastructure. Build reliable systems serving millions of requests.',
     department: 'Engineering & Data Science',
     employmentType: 'Full-time Permanent',
     location: 'Remote',
-    salaryRange: '$160k - $210k',
-    requiredSkills: ['Go', 'Kubernetes', 'PostgreSQL', 'gRPC', 'AWS'],
+    salaryRange: '$60k - $90k',
+    requiredSkills: ['Node.js', 'TypeScript', 'MongoDB', 'Kubernetes', 'AWS'],
     experienceLevel: 'Senior',
     status: 'active' as const,
-    aiWeights: { technicalSkills: 80, yearsOfExperience: 60, educationCredentials: 20, pastProjectImpact: 65 },
-    applicantCount: 86,
-    shortlistedCount: 12,
-    screenedCount: 32,
+    aiWeights: {
+      technicalSkills: 80,
+      yearsOfExperience: 60,
+      educationCredentials: 20,
+      pastProjectImpact: 65,
+    },
+    passingScore: 70,
+    shortlistCap: 10 as const,
+    applicationDeadline: '2026-07-31',
   },
   {
     title: 'Product Design Director',
-    description: 'Setting the visual and strategic direction for the Umurava Lens platform experience across all verticals. Lead a team of designers.',
+    description:
+      'Setting the visual and strategic direction for the Umurava Lens platform experience. Lead a team of designers.',
     department: 'Product Development',
     employmentType: 'Contract (Long term)',
     location: 'Remote',
@@ -47,101 +66,256 @@ const jobs = [
     requiredSkills: ['Figma', 'Strategy', 'Leadership', 'Design Systems', 'User Research'],
     experienceLevel: 'Director',
     status: 'draft' as const,
-    aiWeights: { technicalSkills: 50, yearsOfExperience: 70, educationCredentials: 15, pastProjectImpact: 80 },
-    applicantCount: 0,
-    shortlistedCount: 0,
-    screenedCount: 0,
+    aiWeights: {
+      technicalSkills: 50,
+      yearsOfExperience: 70,
+      educationCredentials: 15,
+      pastProjectImpact: 80,
+    },
+    passingScore: 75,
+    shortlistCap: 10 as const,
+    applicationDeadline: '2026-08-15',
   },
 ];
 
 const candidatesForAIJob = [
   {
-    fullName: 'Sarah Kalsi',
-    email: 'sarah.kalsi@email.com',
+    firstName: 'Sarah',
+    lastName: 'Kalsi',
+    email: 'sarah.kalsi@example.com',
+    headline: 'Principal AI Scientist — LLM Systems & Generative Models',
+    bio: 'World-class AI researcher with 12 years in ML. Led deployment of 5+ enterprise-scale LLM ecosystems at Fortune 500 firms. Strong patent portfolio in generative video synthesis.',
+    location: 'San Francisco, USA',
     phone: '+1-555-0101',
-    location: 'San Francisco, CA',
-    currentTitle: 'Principal Scientist',
-    currentCompany: 'DeepTech AI',
-    summary: 'World-class AI researcher with 12 years in ML/AI. Led deployment of 5+ enterprise-scale LLM ecosystems at Fortune 500 firms. Strong patent portfolio in generative video synthesis.',
-    skills: ['Python', 'PyTorch', 'TensorFlow', 'LLM Fine-tuning', 'Neural Architecture Search', 'Distributed Architecture', 'Vector DBs', 'CUDA', 'Kubernetes'],
-    yearsOfExperience: 12,
-    education: [{ degree: 'PhD Computer Science', institution: 'Stanford University', year: '2014' }],
+    skills: [
+      { name: 'Python', level: 'Expert', yearsOfExperience: 12 },
+      { name: 'PyTorch', level: 'Expert', yearsOfExperience: 9 },
+      { name: 'LLM Fine-tuning', level: 'Expert', yearsOfExperience: 4 },
+      { name: 'Transformers', level: 'Expert', yearsOfExperience: 6 },
+      { name: 'Distributed Computing', level: 'Advanced', yearsOfExperience: 8 },
+      { name: 'Vector DBs', level: 'Advanced', yearsOfExperience: 3 },
+    ],
+    languages: [
+      { name: 'English', proficiency: 'Native' },
+      { name: 'Hindi', proficiency: 'Fluent' },
+    ],
     experience: [
-      { title: 'Principal Scientist', company: 'DeepTech AI', startDate: '2021', endDate: 'Present', description: 'Leading a team of 15+ engineers building next-gen LLM products.' },
-      { title: 'Senior ML Engineer', company: 'Google Brain', startDate: '2017', endDate: '2021', description: 'Developed transformer-based architectures for NLP tasks.' },
+      {
+        company: 'DeepTech AI',
+        role: 'Principal Scientist',
+        startDate: '2021-03',
+        endDate: '',
+        description: 'Leading a team of 15+ engineers building next-gen LLM products.',
+        technologies: ['Python', 'PyTorch', 'Kubernetes', 'Ray'],
+        isCurrent: true,
+      },
+      {
+        company: 'Google Brain',
+        role: 'Senior ML Engineer',
+        startDate: '2017-06',
+        endDate: '2021-02',
+        description: 'Developed transformer-based architectures for NLP tasks.',
+        technologies: ['TensorFlow', 'JAX', 'Python'],
+        isCurrent: false,
+      },
+    ],
+    education: [
+      {
+        institution: 'Stanford University',
+        degree: 'PhD',
+        fieldOfStudy: 'Computer Science',
+        startYear: 2010,
+        endYear: 2014,
+      },
     ],
     projects: [
-      { name: 'Enterprise LLM Platform', description: 'End-to-end platform for deploying fine-tuned LLMs', technologies: ['Python', 'PyTorch', 'Kubernetes', 'Ray'] },
-      { name: 'Video Synthesis Engine', description: 'Generative model for high-fidelity video creation', technologies: ['PyTorch', 'CUDA', 'Diffusion Models'] },
+      {
+        name: 'Enterprise LLM Platform',
+        description: 'End-to-end platform for deploying fine-tuned LLMs.',
+        technologies: ['Python', 'PyTorch', 'Kubernetes', 'Ray'],
+        role: 'Tech Lead',
+        link: 'https://example.com/llm-platform',
+        startDate: '2022-01',
+        endDate: '2024-06',
+      },
     ],
-    certifications: ['Google Cloud ML Engineer', 'AWS ML Specialty'],
-    languages: ['English', 'Hindi'],
-    avatarUrl: '',
+    certifications: [
+      { name: 'Google Cloud ML Engineer', issuer: 'Google', issueDate: '2022-05' },
+      { name: 'AWS ML Specialty', issuer: 'AWS', issueDate: '2021-11' },
+    ],
+    availability: {
+      status: 'Open to Opportunities',
+      type: 'Full-time',
+    },
+    socialLinks: {
+      linkedin: 'https://linkedin.com/in/sarahkalsi',
+      github: 'https://github.com/sarahkalsi',
+      portfolio: 'https://sarahkalsi.dev',
+    },
+    source: 'Umurava Platform',
   },
   {
-    fullName: 'James Drunner',
-    email: 'james.drunner@email.com',
+    firstName: 'James',
+    lastName: 'Drunner',
+    email: 'james.drunner@example.com',
+    headline: 'Senior ML Lead — MLOps & Infrastructure',
+    bio: 'Exceptional MLOps track record with 9 years in the field. Reduced deployment latency by 40% at TechNext.',
+    location: 'Austin, USA',
     phone: '+1-555-0102',
-    location: 'Austin, TX',
-    currentTitle: 'Senior ML Lead',
-    currentCompany: 'FinCore Systems',
-    summary: 'Exceptional MLOps track record with 9 years in the field. Reduced deployment latency by 40% at TechNext. Specializes in cost-efficient scaling for mid-market cloud infrastructures.',
-    skills: ['Python', 'TensorFlow', 'Distributed Computing', 'MLOps', 'Kubernetes', 'Spark', 'Go'],
-    yearsOfExperience: 9,
-    education: [{ degree: 'MS Computer Science', institution: 'MIT', year: '2016' }],
+    skills: [
+      { name: 'Python', level: 'Advanced', yearsOfExperience: 9 },
+      { name: 'TensorFlow', level: 'Advanced', yearsOfExperience: 7 },
+      { name: 'MLOps', level: 'Expert', yearsOfExperience: 6 },
+      { name: 'Kubernetes', level: 'Expert', yearsOfExperience: 5 },
+      { name: 'Go', level: 'Intermediate', yearsOfExperience: 3 },
+    ],
+    languages: [{ name: 'English', proficiency: 'Native' }],
     experience: [
-      { title: 'Senior ML Lead', company: 'FinCore Systems', startDate: '2020', endDate: 'Present', description: 'Architecting ML infrastructure for real-time financial predictions.' },
-      { title: 'ML Engineer', company: 'TechNext', startDate: '2016', endDate: '2020', description: 'Reduced deployment latency by 40% and built scalable ML pipelines.' },
+      {
+        company: 'FinCore Systems',
+        role: 'Senior ML Lead',
+        startDate: '2020-04',
+        endDate: '',
+        description: 'Architecting ML infrastructure for real-time financial predictions.',
+        technologies: ['TensorFlow', 'Kubernetes', 'Spark'],
+        isCurrent: true,
+      },
+      {
+        company: 'TechNext',
+        role: 'ML Engineer',
+        startDate: '2016-08',
+        endDate: '2020-03',
+        description: 'Reduced deployment latency by 40%.',
+        technologies: ['Python', 'Docker', 'Airflow'],
+        isCurrent: false,
+      },
+    ],
+    education: [
+      {
+        institution: 'MIT',
+        degree: 'MS',
+        fieldOfStudy: 'Computer Science',
+        startYear: 2014,
+        endYear: 2016,
+      },
     ],
     projects: [
-      { name: 'Real-time Fraud Detection', description: 'ML system processing 10M+ transactions daily', technologies: ['TensorFlow', 'Spark', 'Kafka'] },
+      {
+        name: 'Real-time Fraud Detection',
+        description: 'ML system processing 10M+ transactions daily.',
+        technologies: ['TensorFlow', 'Spark', 'Kafka'],
+        role: 'Architect',
+        link: '',
+        startDate: '2020-06',
+        endDate: '',
+      },
     ],
-    certifications: ['Kubernetes Administrator', 'TensorFlow Developer Certificate'],
-    languages: ['English'],
-    avatarUrl: '',
+    certifications: [
+      { name: 'Kubernetes Administrator', issuer: 'CNCF', issueDate: '2021-03' },
+    ],
+    availability: { status: 'Open to Opportunities', type: 'Full-time' },
+    socialLinks: { linkedin: 'https://linkedin.com/in/jamesdrunner', github: '', portfolio: '' },
+    source: 'Umurava Platform',
   },
   {
-    fullName: 'Maya Wong',
-    email: 'maya.wong@email.com',
-    phone: '+1-555-0103',
+    firstName: 'Maya',
+    lastName: 'Wong',
+    email: 'maya.wong@example.com',
+    headline: 'AI Architect — Medical & Ethical AI',
+    bio: 'AI architect specializing in medical AI and ethical AI practices. 7 years building AI systems for healthcare.',
     location: 'Toronto, Canada',
-    currentTitle: 'AI Architect',
-    currentCompany: 'NextGen Health',
-    summary: 'AI architect specializing in medical AI and ethical AI practices. 7 years of experience building AI systems for healthcare.',
-    skills: ['Python', 'PyTorch', 'Ethical AI', 'Medical AI', 'NLP', 'Computer Vision'],
-    yearsOfExperience: 7,
-    education: [{ degree: 'MS Artificial Intelligence', institution: 'University of Toronto', year: '2018' }],
+    phone: '+1-555-0103',
+    skills: [
+      { name: 'Python', level: 'Advanced', yearsOfExperience: 7 },
+      { name: 'PyTorch', level: 'Intermediate', yearsOfExperience: 4 },
+      { name: 'NLP', level: 'Advanced', yearsOfExperience: 5 },
+      { name: 'Computer Vision', level: 'Intermediate', yearsOfExperience: 4 },
+      { name: 'Ethical AI', level: 'Expert', yearsOfExperience: 5 },
+    ],
+    languages: [
+      { name: 'English', proficiency: 'Fluent' },
+      { name: 'Mandarin', proficiency: 'Native' },
+      { name: 'French', proficiency: 'Conversational' },
+    ],
     experience: [
-      { title: 'AI Architect', company: 'NextGen Health', startDate: '2019', endDate: 'Present', description: 'Designing AI systems for medical diagnostics and patient care.' },
-      { title: 'ML Engineer', company: 'HealthTech Labs', startDate: '2018', endDate: '2019', description: 'Built NLP models for clinical document processing.' },
+      {
+        company: 'NextGen Health',
+        role: 'AI Architect',
+        startDate: '2019-09',
+        endDate: '',
+        description: 'Designing AI systems for medical diagnostics.',
+        technologies: ['Python', 'PyTorch', 'BERT'],
+        isCurrent: true,
+      },
+    ],
+    education: [
+      {
+        institution: 'University of Toronto',
+        degree: 'MS',
+        fieldOfStudy: 'Artificial Intelligence',
+        startYear: 2016,
+        endYear: 2018,
+      },
     ],
     projects: [
-      { name: 'Clinical NLP Engine', description: 'Processing millions of medical records for diagnostic insights', technologies: ['Python', 'BERT', 'spaCy'] },
+      {
+        name: 'Clinical NLP Engine',
+        description: 'Processing millions of medical records for diagnostic insights.',
+        technologies: ['Python', 'BERT', 'spaCy'],
+        role: 'Lead Architect',
+        link: '',
+        startDate: '2020-01',
+        endDate: '2023-12',
+      },
     ],
-    certifications: ['AI Ethics Certificate - Montreal Institute'],
-    languages: ['English', 'Mandarin', 'French'],
-    avatarUrl: '',
+    certifications: [{ name: 'AI Ethics Certificate', issuer: 'Montreal Institute', issueDate: '2020-06' }],
+    availability: { status: 'Available', type: 'Full-time' },
+    socialLinks: { linkedin: 'https://linkedin.com/in/mayawong', github: '', portfolio: '' },
+    source: 'CSV',
   },
   {
-    fullName: 'Andre Markov',
-    email: 'andre.markov@email.com',
+    firstName: 'Andre',
+    lastName: 'Markov',
+    email: 'andre.markov@example.com',
+    headline: 'Independent Researcher — Bayesian Deep Learning',
+    bio: 'Independent AI researcher with publications in Bayesian deep learning.',
+    location: 'Berlin, Germany',
     phone: '+49-555-0104',
-    location: 'Berlin, DE',
-    currentTitle: 'Independent Researcher',
-    currentCompany: 'Self-employed',
-    summary: 'Independent AI researcher with interesting papers but limited industry experience. Frequent job changes in the past 2 years.',
-    skills: ['Python', 'R', 'Statistical Modeling', 'Bayesian Methods', 'Julia'],
-    yearsOfExperience: 4,
-    education: [{ degree: 'PhD Mathematics', institution: 'Humboldt University', year: '2021' }],
+    skills: [
+      { name: 'Python', level: 'Advanced', yearsOfExperience: 4 },
+      { name: 'R', level: 'Advanced', yearsOfExperience: 4 },
+      { name: 'Statistical Modeling', level: 'Expert', yearsOfExperience: 4 },
+    ],
+    languages: [
+      { name: 'English', proficiency: 'Fluent' },
+      { name: 'German', proficiency: 'Native' },
+      { name: 'Russian', proficiency: 'Native' },
+    ],
     experience: [
-      { title: 'Research Scientist', company: 'AI Lab Berlin', startDate: '2023', endDate: '2024', description: 'Published papers on Bayesian deep learning.' },
-      { title: 'Data Scientist', company: 'StartupX', startDate: '2022', endDate: '2023', description: 'Built basic ML models for recommendation systems.' },
-      { title: 'Junior ML Engineer', company: 'DataCorp', startDate: '2021', endDate: '2022', description: 'Data pipeline work and basic model training.' },
+      {
+        company: 'AI Lab Berlin',
+        role: 'Research Scientist',
+        startDate: '2023-01',
+        endDate: '2024-06',
+        description: 'Published papers on Bayesian deep learning.',
+        technologies: ['Python', 'R'],
+        isCurrent: false,
+      },
+    ],
+    education: [
+      {
+        institution: 'Humboldt University',
+        degree: 'PhD',
+        fieldOfStudy: 'Mathematics',
+        startYear: 2017,
+        endYear: 2021,
+      },
     ],
     projects: [],
     certifications: [],
-    languages: ['English', 'German', 'Russian'],
-    avatarUrl: '',
+    availability: { status: 'Open to Opportunities', type: 'Contract' },
+    socialLinks: { linkedin: '', github: 'https://github.com/amarkov', portfolio: '' },
+    source: 'PDF',
   },
 ];
 
@@ -150,115 +324,82 @@ async function seed() {
   await mongoose.connect(uri);
   console.log('Connected to MongoDB');
 
-  // Clear existing data
-  await Promise.all([Job.deleteMany({}), Candidate.deleteMany({}), ScreeningResult.deleteMany({})]);
+  await Promise.all([
+    Job.deleteMany({}),
+    Candidate.deleteMany({}),
+    ScreeningResult.deleteMany({}),
+    User.deleteMany({}),
+  ]);
   console.log('Cleared existing data');
 
-  // Insert jobs
+  // Seed admin
+  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  await User.create({
+    email: ADMIN_EMAIL,
+    passwordHash,
+    name: ADMIN_NAME,
+    role: 'admin',
+  });
+  console.log(`Seeded admin user: ${ADMIN_EMAIL}`);
+
   const createdJobs = await Job.insertMany(jobs);
   console.log(`Created ${createdJobs.length} jobs`);
 
-  // Insert candidates linked to the first job (AI Research Engineer)
   const aiJob = createdJobs[0];
   const candidatesWithJob = candidatesForAIJob.map((c) => ({ ...c, jobId: aiJob._id }));
   const createdCandidates = await Candidate.insertMany(candidatesWithJob);
   console.log(`Created ${createdCandidates.length} candidates for "${aiJob.title}"`);
 
-  // Pre-create screening results (demo data)
-  const screeningResults = [
-    {
+  // Pre-computed demo screening results so the UI has something without hitting Gemini
+  const passingScore = aiJob.passingScore ?? 70;
+  const scores = [98, 92, 86, 72];
+  const recs: Array<'hire' | 'consider' | 'risky'> = ['hire', 'hire', 'consider', 'consider'];
+
+  const screeningResults = createdCandidates.map((c, i) => {
+    const score = scores[i];
+    const shortlisted = score >= passingScore;
+    return {
       jobId: aiJob._id,
-      candidateId: createdCandidates[0]._id,
-      score: 98,
-      rank: 1,
+      candidateId: c._id,
+      score,
+      rank: i + 1,
       strengths: [
-        'Expert in Neural Architecture Search and LLM Fine-tuning.',
-        'Led high-performance teams of 15+ engineers to ship global products.',
-        'Strong patent portfolio in generative video synthesis.',
+        `Concrete experience: ${c.experience[0]?.role || 'N/A'} at ${c.experience[0]?.company || 'N/A'}.`,
+        `Strong in ${c.skills.slice(0, 3).map((s) => s.name).join(', ') || 'relevant skills'}.`,
       ],
-      gaps: [
-        'Higher salary expectations than the initial budget range.',
-        'Likely to have competing offers from Tier 1 tech firms.',
-      ],
-      summary: 'Sarah is the definitive top candidate. Her technical mastery in AI research aligns perfectly with our 2024 roadmap. Recommend immediate outreach before she enters wider market rotation.',
-      recommendation: 'hire' as const,
-      confidence: 96,
-      technicalSkillsScore: 99,
-      experienceScore: 95,
-      educationScore: 98,
-      projectImpactScore: 97,
-    },
-    {
-      jobId: aiJob._id,
-      candidateId: createdCandidates[1]._id,
-      score: 92,
-      rank: 2,
-      strengths: [
-        'Exceptional MLOps track record with proven infrastructure scaling.',
-        'Strong distributed computing expertise with TensorFlow.',
-        'Demonstrated scalability wins at FinCore Systems.',
-      ],
-      gaps: [
-        'Less direct LLM fine-tuning experience compared to top candidate.',
-        'May need onboarding time for PyTorch-heavy workflows.',
-      ],
-      summary: 'James is a strong hire for infrastructure-heavy ML roles. His pragmatic approach to scaling makes him ideal for our growth phase. Consider for the Backend Lead role if not placed here.',
-      recommendation: 'hire' as const,
-      confidence: 91,
-      technicalSkillsScore: 90,
-      experienceScore: 92,
-      educationScore: 90,
-      projectImpactScore: 88,
-    },
-    {
-      jobId: aiJob._id,
-      candidateId: createdCandidates[2]._id,
-      score: 86,
-      rank: 3,
-      strengths: [
-        'Unique medical AI background brings valuable domain diversity.',
-        'Strong ethical AI specialist with formal certification.',
-      ],
-      gaps: [
-        'Limited experience with large-scale transformer models.',
-        'Healthcare focus may not directly transfer to our product domain.',
-      ],
-      summary: 'Maya brings a unique perspective from medical AI. Her ethical AI expertise is valuable but her core technical stack may need supplementing for our specific LLM research focus.',
-      recommendation: 'consider' as const,
-      confidence: 82,
-      technicalSkillsScore: 78,
-      experienceScore: 80,
-      educationScore: 85,
-      projectImpactScore: 75,
-    },
-    {
-      jobId: aiJob._id,
-      candidateId: createdCandidates[3]._id,
-      score: 72,
-      rank: 4,
-      strengths: [
-        'Strong mathematical foundations from PhD in Mathematics.',
-        'Published research in Bayesian deep learning.',
-      ],
-      gaps: [
-        'Low collaboration score - primarily solo researcher.',
-        'Job hopping pattern: 4 roles in 2 years.',
-        'No production-scale ML deployment experience.',
-      ],
-      summary: 'Andre has interesting research credentials but lacks the industry experience and team leadership this senior role requires. High risk due to frequent job changes and limited production work.',
-      recommendation: 'risky' as const,
-      confidence: 88,
-      technicalSkillsScore: 65,
-      experienceScore: 55,
-      educationScore: 90,
-      projectImpactScore: 50,
-    },
-  ];
+      gaps:
+        score < 85
+          ? ['Fewer years in the specific tech stack than top candidates.', 'Less exposure to LLM fine-tuning at scale.']
+          : ['May have competing offers.'],
+      summary: `${c.firstName} ${c.lastName} is a ${score >= 85 ? 'strong' : 'promising'} fit for the ${aiJob.title} role. ${shortlisted ? 'Recommend outreach.' : 'Keep warm.'}`,
+      recommendation: recs[i],
+      confidence: 85 + (i % 3) * 3,
+      technicalSkillsScore: Math.max(50, score - 2),
+      experienceScore: Math.max(50, score - 5),
+      educationScore: Math.max(60, score - 1),
+      projectImpactScore: Math.max(50, score - 8),
+      shortlisted,
+      emailSubject: shortlisted
+        ? `Interview Invitation — ${aiJob.title} at Umurava`
+        : `Your application for ${aiJob.title} at Umurava`,
+      emailDraft: shortlisted
+        ? `Hi ${c.firstName},\n\nThank you for applying to the ${aiJob.title} role at Umurava. Your background in ${c.skills[0]?.name || 'your field'} and your experience at ${c.experience[0]?.company || 'your current role'} caught our attention.\n\nWe'd love to set up a 30-minute conversation to explore fit. Please reply with 2-3 time slots that work for you this week.\n\nLooking forward,\nThe Umurava Talent Team`
+        : `Hi ${c.firstName},\n\nThank you for your interest in the ${aiJob.title} role at Umurava. We had an incredibly strong pool of candidates, and after careful review we've decided to move forward with others whose experience maps more directly to this role's immediate focus.\n\nWe'd love to stay in touch — we publish new roles often, and your profile is now in our talent network.\n\nWarmly,\nThe Umurava Talent Team`,
+      emailStatus: 'not_sent' as const,
+    };
+  });
 
   await ScreeningResult.insertMany(screeningResults);
   console.log(`Created ${screeningResults.length} screening results`);
 
-  console.log('\nSeed complete! Summary:');
+  await Job.findByIdAndUpdate(aiJob._id, {
+    applicantCount: createdCandidates.length,
+    screenedCount: createdCandidates.length,
+    shortlistedCount: screeningResults.filter((r) => r.shortlisted).length,
+  });
+
+  console.log('\nSeed complete. Summary:');
+  console.log(`- Admin login: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   console.log(`- Jobs: ${createdJobs.length}`);
   console.log(`- Candidates: ${createdCandidates.length}`);
   console.log(`- Screening Results: ${screeningResults.length}`);
@@ -267,4 +408,8 @@ async function seed() {
   console.log('Disconnected from MongoDB');
 }
 
-seed().catch(console.error);
+seed().catch(async (err) => {
+  console.error(err);
+  await mongoose.disconnect();
+  process.exit(1);
+});

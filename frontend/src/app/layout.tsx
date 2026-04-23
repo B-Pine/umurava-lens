@@ -1,12 +1,11 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import ReduxProvider from '../store/Provider';
-import Sidebar from '../components/layout/Sidebar';
-import Topbar from '../components/layout/Topbar';
+import AppShell from '../components/layout/AppShell';
 
 export const metadata: Metadata = {
   title: 'Umurava Lens | AI Talent Intelligence',
-  description: 'AI-powered recruitment screening platform',
+  description: 'AI-powered recruitment screening platform built for the Umurava AI Hackathon.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,16 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full bg-surface text-on-surface font-[family-name:var(--font-body)]">
         <ReduxProvider>
-          <Sidebar />
-          <main className="ml-64 min-h-screen">
-            <Topbar />
-            <div className="pt-24 px-8 pb-12">
-              {children}
-            </div>
-          </main>
+          <AppShell>{children}</AppShell>
         </ReduxProvider>
       </body>
     </html>
   );
 }
-

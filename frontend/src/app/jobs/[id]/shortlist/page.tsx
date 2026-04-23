@@ -8,6 +8,7 @@ import { fetchScreeningResults, runScreening } from '../../../../store/screening
 import ScoreBadge from '../../../../components/ui/ScoreBadge';
 import { TableSkeleton } from '../../../../components/ui/LoadingSkeleton';
 import EmptyState from '../../../../components/ui/EmptyState';
+import OutreachPanel from '../../../../components/screening/OutreachPanel';
 
 export default function ShortlistPage() {
   const params = useParams();
@@ -15,7 +16,7 @@ export default function ShortlistPage() {
   const dispatch = useAppDispatch();
   const jobId = params.id as string;
   const { results, job, loading, screening, error } = useAppSelector((s) => s.screening);
-  const [filter, setFilter] = useState<'all' | 'top10' | 'top20' | 'score80'>('all');
+  const [filter, setFilter] = useState<'all' | 'shortlisted' | 'top10' | 'top20' | 'score80'>('shortlisted');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function ShortlistPage() {
   };
 
   const filteredResults = results.filter((r) => {
+    if (filter === 'shortlisted') return r.shortlisted;
     if (filter === 'top10') return r.rank <= 10;
     if (filter === 'top20') return r.rank <= 20;
     if (filter === 'score80') return r.score >= 80;
@@ -42,7 +44,13 @@ export default function ShortlistPage() {
   });
 
   const handleRerun = async () => {
-    await dispatch(runScreening(jobId));
+    await dispatch(
+      runScreening({
+        jobId,
+        jobTitle: job?.title || 'Job',
+        candidateCount: job?.applicantCount || 0,
+      })
+    );
     dispatch(fetchScreeningResults({ jobId }));
   };
 
@@ -81,10 +89,11 @@ export default function ShortlistPage() {
       {/* Filter Tabs */}
       <div className="flex flex-wrap gap-3 mb-8">
         {[
-          { key: 'all', label: 'All' },
+          { key: 'shortlisted', label: `Shortlist (Top ${job?.shortlistCap ?? 20})` },
           { key: 'top10', label: 'Top 10' },
           { key: 'top20', label: 'Top 20' },
-          { key: 'score80', label: 'Score Range (80%+)' },
+          { key: 'score80', label: 'Score ≥ 80' },
+          { key: 'all', label: 'All Candidates' },
         ].map((f) => (
           <button
             key={f.key}
@@ -147,7 +156,7 @@ export default function ShortlistPage() {
                       result.recommendation === 'consider' ? 'border-surface-tint' : 'border-error'
                     }`}>
                       <div className="w-full h-full rounded-full bg-gradient-to-br from-secondary/20 to-secondary-container/20 flex items-center justify-center text-secondary font-bold text-lg">
-                        {candidate.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                        {`${candidate.firstName?.[0] || ''}${candidate.lastName?.[0] || ''}`.toUpperCase() || '?'}
                       </div>
                     </div>
                   </div>
@@ -156,11 +165,15 @@ export default function ShortlistPage() {
                   <div className="flex-1">
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="text-2xl font-bold text-on-primary-fixed mb-1">{candidate.fullName}</h3>
+                        <h3 className="text-2xl font-bold text-on-primary-fixed mb-1">{`${candidate.firstName} ${candidate.lastName}`.trim()}</h3>
                         <div className="flex items-center gap-3 text-sm text-on-surface-variant">
-                          <span>{candidate.currentTitle} @ {candidate.currentCompany}</span>
-                          <span className="w-1 h-1 bg-outline-variant rounded-full" />
-                          <span>{candidate.location}</span>
+                          <span>{candidate.headline || candidate.email}</span>
+                          {candidate.location && (
+                            <>
+                              <span className="w-1 h-1 bg-outline-variant rounded-full" />
+                              <span>{candidate.location}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -215,6 +228,8 @@ export default function ShortlistPage() {
                           <p className="text-sm font-semibold text-on-tertiary-fixed mb-1">Final AI Recommendation</p>
                           <p className="text-sm text-on-surface-variant leading-relaxed">{result.summary}</p>
                         </div>
+
+                        <OutreachPanel result={result} />
                       </div>
                     )}
 

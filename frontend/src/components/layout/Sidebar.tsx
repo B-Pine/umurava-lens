@@ -8,7 +8,7 @@ const navItems = [
   { label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
   { label: 'Jobs', icon: 'work', href: '/jobs' },
   { label: 'Candidates', icon: 'group', href: '/candidates' },
-  { label: 'Settings', icon: 'settings', href: '/settings' },
+  { label: 'Shortlisted', icon: 'workspace_premium', href: '/shortlisted' },
 ];
 
 export default function Sidebar() {

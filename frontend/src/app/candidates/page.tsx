@@ -202,20 +202,18 @@ export default function CandidatesPage() {
                   className="accent-primary w-4 h-4"
                 />
                 <div className="w-14 h-14 rounded-full bg-linear-to-br from-secondary to-secondary-container flex items-center justify-center text-white font-bold text-lg">
-                  {c.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                  {`${c.firstName?.[0] || ''}${c.lastName?.[0] || ''}`.toUpperCase() || '?'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-on-surface truncate">{c.fullName}</h4>
-                  <p className="text-sm text-on-surface-variant truncate">
-                    {c.currentTitle}{c.currentCompany ? ` at ${c.currentCompany}` : ''}
-                  </p>
+                  <h4 className="font-bold text-on-surface truncate">{`${c.firstName} ${c.lastName}`.trim()}</h4>
+                  <p className="text-sm text-on-surface-variant truncate">{c.headline || c.email}</p>
                   <div className="flex flex-wrap gap-2 mt-2 items-center">
-                    {c.skills.slice(0, 4).map((skill) => (
-                      <span key={skill} className="px-2 py-0.5 bg-surface-container text-on-surface-variant text-[10px] font-medium rounded">
-                        {skill}
+                    {(c.skills || []).slice(0, 4).map((skill) => (
+                      <span key={skill.name} className="px-2 py-0.5 bg-surface-container text-on-surface-variant text-[10px] font-medium rounded">
+                        {skill.name}
                       </span>
                     ))}
-                    {c.skills.length > 4 && (
+                    {(c.skills || []).length > 4 && (
                       <span className="text-[10px] text-on-surface-variant font-medium">+{c.skills.length - 4} more</span>
                     )}
                     {job && (
@@ -226,14 +224,14 @@ export default function CandidatesPage() {
                   </div>
                 </div>
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold">{c.yearsOfExperience} yrs exp</p>
+                  <p className="text-sm font-semibold">{c.yearsOfExperience ?? 0} yrs exp</p>
                   <p className="text-xs text-on-surface-variant">{c.location}</p>
                   <p className="text-[10px] text-on-surface-variant mt-1">
                     {new Date(c.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <button
-                  onClick={() => handleDeleteOne(c._id, c.fullName)}
+                  onClick={() => handleDeleteOne(c._id, `${c.firstName} ${c.lastName}`.trim())}
                   title="Delete candidate"
                   className="w-9 h-9 rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center"
                 >

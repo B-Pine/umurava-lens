@@ -1,435 +1,406 @@
-# 🔍 Umurava Lens — AI Talent Intelligence Platform
+# Umurava Lens
 
-> AI-powered recruitment screening platform that helps recruiters create job postings, upload candidates, run intelligent AI screening using Google Gemini, and view ranked shortlists with explainable insights.
+**AI-powered talent screening for recruiters.** Built for the Umurava AI Hackathon.
 
-![Tech Stack](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
+Umurava Lens helps recruiters create job postings, ingest candidates in multiple formats, run
+a single AI pass that evaluates and ranks every applicant, review explainable strengths and
+gaps, and send AI-drafted outreach emails — with the **recruiter always making the final call**.
+
+![Stack](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![MongoDB](https://img.shields.io/badge/MongoDB-9-green?logo=mongodb)
-![Gemini](https://img.shields.io/badge/Google%20Gemini-API-4285F4?logo=google)
+![Redux%20Toolkit](https://img.shields.io/badge/Redux%20Toolkit-2-purple?logo=redux)
+![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)
+![Gemini](https://img.shields.io/badge/Gemini-API-4285F4?logo=google)
 
 ---
 
-## 📋 Table of Contents
+## Table of contents
 
-- [Overview](#-overview)
-- [Architecture](#-architecture)
-- [Tech Stack](#-tech-stack)
-- [AI Decision Flow](#-ai-decision-flow)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [API Reference](#-api-reference)
-- [Project Structure](#-project-structure)
-- [Screens](#-screens)
-- [Deployment](#-deployment)
-
----
-
-## 🎯 Overview
-
-Umurava Lens is a production-ready SaaS application for recruitment screening. It enables:
-
-- **Job Management** — Create, edit, and manage job postings with AI-configurable weights
-- **Candidate Ingestion** — Bulk upload candidates with rich talent profiles
-- **AI Screening** — One-click AI-powered candidate evaluation using Google Gemini
-- **Ranked Shortlists** — View AI-generated rankings with strengths, gaps, and recommendations
-- **Side-by-Side Comparison** — Deep-dive comparison between top candidates
+- [What it does](#what-it-does)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Talent Profile Schema](#talent-profile-schema)
+- [AI decision flow](#ai-decision-flow)
+- [Human-in-the-loop: outreach](#human-in-the-loop-outreach)
+- [Local setup](#local-setup)
+- [Environment variables](#environment-variables)
+- [Deployment](#deployment)
+- [Project structure](#project-structure)
+- [API reference](#api-reference)
+- [Assumptions and limitations](#assumptions-and-limitations)
 
 ---
 
-## 🏗 Architecture
+## What it does
+
+**Scenario 1 — Applicants from Umurava's platform:**
+Upload structured candidate profiles (matching the Umurava Talent Profile Schema) via JSON,
+pre-seeded profiles, or bulk uploads. Run AI screening → get a ranked shortlist with a
+configurable Top 10 or Top 20 cap.
+
+**Scenario 2 — Applicants from external sources:**
+Drop PDF resumes or CSV spreadsheets directly into the app. Gemini extracts structured profile
+data into the same schema. Drive picker is supported for recruiters who store resumes in
+Google Drive.
+
+For each shortlisted candidate the recruiter sees:
+
+- Overall match score (0–100) + confidence
+- Sub-scores per dimension (skills, experience, education, project impact)
+- Specific strengths and gaps tied to the candidate's profile
+- A recommendation (`hire`, `consider`, `risky`)
+- A **draft outreach email** — pre-written but never auto-sent
+
+---
+
+## Architecture
 
 ```
-┌────────────────┐        ┌────────────────┐        ┌─────────────┐
-│                │  REST  │                │   AI   │             │
-│   Next.js App  │◄──────►│  Express API   │◄──────►│ Gemini API  │
-│   (Frontend)   │  JSON  │  (Backend)     │  JSON  │  (Google)   │
-│                │        │                │        │             │
-└────────────────┘        └───────┬────────┘        └─────────────┘
-                                  │
-                                  ▼
-                          ┌──────────────┐
-                          │   MongoDB    │
-                          │  (Database)  │
-                          └──────────────┘
+┌─────────────────────┐         REST          ┌──────────────────────┐
+│   Next.js 16 App    │ ───────────────────▶ │  Express 5 API       │
+│   Redux Toolkit     │ ◀─────────────────── │  TypeScript          │
+│   Tailwind 4        │        JSON + JWT     │  JWT auth            │
+└─────────────────────┘                       └──────┬───────────────┘
+                                                     │
+                                         ┌───────────┼───────────────┐
+                                         │           │               │
+                                         ▼           ▼               ▼
+                                  ┌─────────────┐ ┌────────┐  ┌──────────────┐
+                                  │  MongoDB    │ │ Gemini │  │   SMTP       │
+                                  │  Atlas /    │ │ API    │  │  (Ethereal   │
+                                  │  local      │ │        │  │   fallback)  │
+                                  └─────────────┘ └────────┘  └──────────────┘
 ```
 
-### Data Flow
+**Collections:** `users`, `jobs`, `candidates`, `screeningresults`.
 
-1. Recruiter creates a job with AI weighting configuration
-2. Candidates are uploaded (structured JSON or file upload)
-3. Recruiter triggers AI screening
-4. Backend fetches job + candidates, sends to Gemini with structured prompt
-5. Gemini returns scored, ranked results in JSON format
-6. Results are stored in MongoDB
-7. Frontend displays ranked shortlist with actionable insights
+**AI calls:** two — `extractCandidateFromCV` (CV → structured Talent Profile) and
+`screenCandidates` (job + candidates → ranked results + per-candidate email drafts).
 
 ---
 
-## 🛠 Tech Stack
+## Tech stack
 
-### Frontend
-| Technology | Purpose |
-|---|---|
-| **Next.js 16** (App Router) | React framework with SSR/SSG |
-| **TypeScript** | Type safety |
-| **Tailwind CSS 4** | Utility-first styling |
-| **Redux Toolkit** | State management with async thunks |
-| **Axios** | HTTP client |
-
-### Backend
-| Technology | Purpose |
-|---|---|
-| **Node.js + TypeScript** | Server runtime |
-| **Express 5** | REST API framework |
-| **MongoDB + Mongoose 9** | Database & ODM |
-| **Google Gemini API** | AI-powered screening |
-| **Multer** | File upload handling |
-
----
-
-## 🧠 AI Decision Flow
-
-### Scoring Dimensions (Configurable per Job)
-| Dimension | Default Weight | Description |
+| Layer | Tech | Notes |
 |---|---|---|
-| Technical Skills | 85% | Verified code & platform proficiency |
-| Years of Experience | 40% | Tenure and career progression |
-| Education Credentials | 25% | Degrees and institutional quality |
-| Past Project Impact | 70% | Portfolio quality and proven outcomes |
+| Frontend framework | **Next.js 16** (App Router) | Spec-required |
+| State | **Redux Toolkit** with async thunks | Spec-required |
+| Styling | **Tailwind CSS 4** | |
+| Backend | **Node.js + TypeScript + Express 5** | |
+| Database | **MongoDB + Mongoose 9** | Spec-required |
+| LLM | **Google Gemini** (`gemini-flash-latest`) | Spec-required |
+| Auth | JWT + bcrypt | Single recruiter role for the hackathon |
+| Email | Nodemailer — real SMTP in prod, Ethereal fallback in dev | |
+| File parsing | `pdf-parse` for resumes, `csv-parser` for spreadsheets | |
+| Drive integration | Google Picker API (optional) | |
 
-### AI Pipeline
+---
 
-```
-Job Data + Candidates ─► Preprocessing ─► Gemini Prompt ─► Structured JSON ─► Database
-                                              │
-                                    ┌─────────┴─────────┐
-                                    │  Scoring Logic:    │
-                                    │  - Skills Match    │
-                                    │  - Experience Fit  │
-                                    │  - Project Impact  │
-                                    │  - Education       │
-                                    │  - Confidence %    │
-                                    └────────────────────┘
-```
+## Talent Profile Schema
 
-### Output Format
-```json
+The Mongoose `Candidate` model in [backend/src/models/Candidate.ts](backend/src/models/Candidate.ts)
+implements the full Umurava Talent Profile Schema verbatim:
+
+```ts
 {
-  "candidates": [
-    {
-      "candidateId": "MongoDB ObjectId",
-      "score": 98,
-      "rank": 1,
-      "strengths": ["Specific evidence-based strength"],
-      "gaps": ["Specific actionable gap"],
-      "summary": "Professional 2-3 sentence assessment",
-      "recommendation": "hire | consider | risky",
-      "confidence": 96,
-      "technicalSkillsScore": 99,
-      "experienceScore": 95,
-      "educationScore": 98,
-      "projectImpactScore": 97
-    }
-  ]
+  firstName, lastName, email, headline, bio, location, phone,
+  skills:         [{ name, level: "Beginner|Intermediate|Advanced|Expert", yearsOfExperience }],
+  languages:      [{ name, proficiency: "Basic|Conversational|Fluent|Native" }],
+  experience:     [{ company, role, startDate, endDate, description, technologies[], isCurrent }],
+  education:      [{ institution, degree, fieldOfStudy, startYear, endYear }],
+  certifications: [{ name, issuer, issueDate }],
+  projects:       [{ name, description, technologies[], role, link, startDate, endDate }],
+  availability:   { status: "Available|Open to Opportunities|Not Available",
+                    type:   "Full-time|Part-time|Contract",
+                    startDate? },
+  socialLinks:    { linkedin, github, portfolio, ... },
+  source:         "Umurava Platform | CSV | PDF | Google Drive | Manual"
 }
 ```
 
-### Recommendation Thresholds
-- **HIRE** → Score ≥ 85
-- **CONSIDER** → Score 70-84
-- **RISKY** → Score < 70
-
-### AI Safeguards
-- Temperature: `0.1` (near-deterministic)
-- Response format: `application/json` (enforced)
-- JSON extraction fallback for malformed responses
-- Retry support (re-run screening)
+Required fields are enforced at the model level. CSV/PDF ingestion runs every candidate through
+`normalizeCandidate()` to guarantee enum correctness before insertion.
 
 ---
 
-## 🚀 Getting Started
+## AI decision flow
+
+```
+                    JOB + CANDIDATES
+                          │
+                          ▼
+   ┌────────────────────────────────────────────────┐
+   │  Prompt builder                                │
+   │  - Injects full job spec & aiWeights           │
+   │  - Inlines each candidate's Talent Profile     │
+   │  - Embeds passingScore + shortlistCap          │
+   │  - Forces JSON response schema                 │
+   └────────────────┬───────────────────────────────┘
+                    ▼
+          Gemini (temperature 0.1, JSON mode)
+                    │
+                    ▼
+   ┌────────────────────────────────────────────────┐
+   │  Output per candidate:                         │
+   │  - score, rank, confidence                     │
+   │  - sub-scores (skills/exp/edu/projects)        │
+   │  - strengths[], gaps[]                         │
+   │  - recommendation (hire/consider/risky)        │
+   │  - emailSubject, emailDraft                    │
+   └────────────────┬───────────────────────────────┘
+                    ▼
+   ┌────────────────────────────────────────────────┐
+   │  Post-processing                               │
+   │  - Sort by rank                                │
+   │  - Flag shortlisted = (score ≥ passingScore)   │
+   │                       AND (rank ≤ shortlistCap)│
+   │  - Persist ScreeningResult (one per candidate) │
+   │  - Update Job counters                         │
+   └────────────────────────────────────────────────┘
+```
+
+**Why this design:**
+
+- **One prompt, all candidates.** Multi-candidate comparison in a single pass gives the LLM
+  context to rank consistently. It also keeps the cost and latency budget for a 50-candidate job
+  inside one API call.
+- **Weights come from the recruiter.** Each job has `aiWeights` (technical / experience /
+  education / project impact, 0–100). The prompt tells Gemini to apply them explicitly.
+- **Determinism over creativity.** `temperature: 0.1`, `responseMimeType: 'application/json'`,
+  and a brace-matching JSON extractor for fallback parsing (`extractJson()` in
+  [geminiService.ts](backend/src/services/geminiService.ts)).
+- **Top 10 / Top 20.** `shortlistCap` is a per-job field (spec asks for "Top 10 or 20"). The
+  prompt still evaluates *every* candidate so the recruiter has full context, but only the top N
+  passing candidates are flagged as `shortlisted`.
+
+---
+
+## Human-in-the-loop: outreach
+
+The spec is explicit: **the recruiter makes the final hiring decision, not the AI.** Lens
+enforces this at two levels:
+
+1. **No auto-send.** Gemini drafts `emailSubject` + `emailDraft` per candidate during screening
+   (interview invite for shortlisted, graceful decline for the rest). Drafts are saved with
+   `emailStatus: 'not_sent'`.
+2. **Recruiter reviews and sends.** On each shortlist card there is an `OutreachPanel`
+   component — recruiters can edit the subject/body, save drafts, and only when they explicitly
+   click **Send email** (with a confirmation prompt) does the outreach leave the system. The
+   `emailStatus` flips to `sent` and the `emailSentAt` timestamp is persisted.
+
+Ethereal SMTP is used as a safe dev fallback: emails are captured to a preview URL rather than
+delivered, so demos never leak into real inboxes.
+
+---
+
+## Local setup
 
 ### Prerequisites
 
-- **Node.js** v18+
-- **MongoDB** (local or Atlas connection string)
-- **Google Gemini API Key** – [Get one here](https://aistudio.google.com/app/apikey)
+- **Node.js** v18 or higher
+- **MongoDB** (local install or a free Atlas cluster)
+- **Google Gemini API key** — https://aistudio.google.com/app/apikey
 
-### Installation
+### 1. Clone and install
 
 ```bash
-# Clone the repository
+git clone <repo-url>
 cd umurava-lens
 
-# Install backend dependencies
+# Backend
 cd backend
+cp .env.example .env   # then fill in GEMINI_API_KEY + MONGODB_URI
 npm install
 
-# Install frontend dependencies
+# Frontend
 cd ../frontend
+cp .env.example .env.local
 npm install
 ```
 
-### Configuration
+### 2. Seed the database
 
-Create a `.env` file in the `backend/` directory:
-
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/umurava-lens
-GEMINI_API_KEY=your_actual_gemini_api_key
-NODE_ENV=development
-```
-
-### Seed the Database (Optional)
-
-Populate the database with sample data:
+From `backend/`:
 
 ```bash
-cd backend
 npm run seed
 ```
 
 This creates:
-- 3 sample jobs (AI Engineer, Backend Lead, Design Director)
-- 4 candidates with rich profiles
-- Pre-computed screening results
 
-### Run the Application
+- 1 admin recruiter user (credentials logged at the end of seeding — default is
+  `admin@umurava.africa` / `umurava-admin-2026`, configurable via `SEED_ADMIN_*` env vars).
+- 3 jobs (one active with pre-screened candidates).
+- 4 candidates matching the Umurava Talent Profile Schema.
+- 4 screening results with recruiter-ready email drafts.
+
+### 3. Run
 
 ```bash
-# Terminal 1: Start the backend
-cd backend
-npm run dev
+# Terminal 1
+cd backend && npm run dev
+# → http://localhost:5000/api/health
 
-# Terminal 2: Start the frontend
-cd frontend
-npm run dev
+# Terminal 2
+cd frontend && npm run dev
+# → http://localhost:3000
 ```
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5000/api
-- **Health Check**: http://localhost:5000/api/health
+Sign in at http://localhost:3000/login with the seeded credentials.
 
 ---
 
-## 🔑 Environment Variables
+## Environment variables
 
-| Variable | Required | Description |
+### Backend (`backend/.env`)
+
+| Variable | Required | Purpose |
 |---|---|---|
-| `PORT` | No | Backend port (default: 5000) |
-| `MONGODB_URI` | Yes | MongoDB connection string |
-| `GEMINI_API_KEY` | Yes | Google Gemini API key for AI screening |
-| `NODE_ENV` | No | Environment mode (development/production) |
-| `NEXT_PUBLIC_API_URL` | No | Frontend API URL (default: http://localhost:5000/api) |
+| `PORT` | no | API port (default 5000) |
+| `NODE_ENV` | no | `development` / `production` |
+| `MONGODB_URI` | **yes** | Mongo connection string |
+| `GEMINI_API_KEY` | **yes** | Gemini LLM key |
+| `JWT_SECRET` | **yes in prod** | Secret for signing JWTs |
+| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` | no | Seeded admin |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | no | Real outreach delivery; if any is missing, Ethereal is used |
+
+### Frontend (`frontend/.env.local`)
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | yes in prod | Backend API base URL (with `/api` suffix) |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_API_KEY` / `NEXT_PUBLIC_GOOGLE_APP_ID` | no | Google Drive picker on the upload page |
 
 ---
 
-## 📡 API Reference
+## Deployment
 
-### Jobs
+**Frontend → Vercel**
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/jobs/dashboard/stats` | Dashboard statistics |
-| `POST` | `/api/jobs` | Create a new job |
-| `GET` | `/api/jobs` | List jobs (with filters/pagination) |
-| `GET` | `/api/jobs/:id` | Get job by ID |
-| `PUT` | `/api/jobs/:id` | Update a job |
-| `DELETE` | `/api/jobs/:id` | Delete a job |
+- Root directory: `frontend/`
+- Build command: `npm run build` (auto)
+- Set `NEXT_PUBLIC_API_URL` to the deployed backend URL.
 
-**Query Parameters (GET /api/jobs):**
-- `status` — Filter by status (active/draft/closed)
-- `experienceLevel` — Filter by experience level
-- `sort` — Sort order (applicants)
-- `page` — Page number
-- `limit` — Items per page
+**Backend → Render / Railway / Fly.io**
 
-### Candidates
+A Render blueprint is included at the repo root as [`render.yaml`](render.yaml). On Render,
+point a new Blueprint at the repo and fill the secrets prompted (Mongo URI, Gemini key, SMTP).
+A [`Procfile`](backend/Procfile) is also provided for Heroku-style hosts.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/candidates/upload` | Upload candidates (JSON array) |
-| `GET` | `/api/candidates` | List candidates |
-| `GET` | `/api/candidates/:id` | Get candidate by ID |
+**Database → MongoDB Atlas** (free M0 tier works).
 
-**Upload Body:**
-```json
-{
-  "jobId": "optional_mongodb_id",
-  "candidates": [
-    {
-      "fullName": "Sarah Kalsi",
-      "email": "sarah@email.com",
-      "currentTitle": "Principal Scientist",
-      "currentCompany": "DeepTech AI",
-      "skills": ["Python", "PyTorch"],
-      "yearsOfExperience": 12,
-      "education": [{ "degree": "PhD CS", "institution": "Stanford", "year": 2014 }],
-      "experience": [{ "title": "Principal Scientist", "company": "DeepTech AI", "startDate": "2021", "endDate": "Present", "description": "Leading LLM products." }],
-      "projects": [{ "name": "LLM Platform", "description": "End-to-end LLM deployment", "technologies": ["Python", "PyTorch"] }]
-    }
-  ]
-}
-```
+Post-deploy checklist:
 
-### Screening
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/screening/run` | Run AI screening for a job |
-| `GET` | `/api/screening/:jobId` | Get screening results |
-| `GET` | `/api/screening/compare` | Compare candidates |
-
-**Run Screening Body:**
-```json
-{ "jobId": "mongodb_job_id" }
-```
-
-**Compare Query:**
-```
-/api/screening/compare?candidateIds=id1,id2&jobId=jobId
-```
+1. Set `NODE_ENV=production`.
+2. Set a strong `JWT_SECRET`.
+3. Run `npm run seed` once against the production DB (or create an admin manually).
+4. Hit `/api/health` to confirm the service is up.
 
 ---
 
-## 📁 Project Structure
+## Project structure
 
 ```
 umurava-lens/
 ├── backend/
 │   ├── src/
-│   │   ├── config/
-│   │   │   ├── database.ts          # MongoDB connection
-│   │   │   └── gemini.ts            # Gemini client singleton
-│   │   ├── controllers/
-│   │   │   ├── jobController.ts     # Job CRUD + dashboard stats
-│   │   │   ├── candidateController.ts # Candidate upload + listing
-│   │   │   └── screeningController.ts # AI screening + comparison
-│   │   ├── models/
-│   │   │   ├── Job.ts               # Job schema (weights, skills, status)
-│   │   │   ├── Candidate.ts         # Rich talent profile schema
-│   │   │   └── ScreeningResult.ts   # AI evaluation results
-│   │   ├── routes/
-│   │   │   ├── jobRoutes.ts         # /api/jobs routes
-│   │   │   ├── candidateRoutes.ts   # /api/candidates routes
-│   │   │   └── screeningRoutes.ts   # /api/screening routes
-│   │   ├── services/
-│   │   │   └── geminiService.ts     # Gemini AI integration
-│   │   ├── index.ts                 # Express server entry
-│   │   └── seed.ts                  # Database seeding script
-│   ├── .env                         # Environment variables
-│   ├── package.json
-│   └── tsconfig.json
-│
+│   │   ├── config/            # Mongo + Gemini client setup
+│   │   ├── models/            # User, Job, Candidate, ScreeningResult
+│   │   ├── services/          # geminiService, emailService
+│   │   ├── controllers/       # auth, job, candidate, screening, outreach
+│   │   ├── middleware/        # auth JWT guard
+│   │   ├── routes/            # Express route groups
+│   │   ├── seed.ts            # Admin + demo data seeder
+│   │   └── index.ts           # Server entry
+│   ├── .env.example
+│   └── Procfile
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── dashboard/page.tsx   # Main dashboard
-│   │   │   ├── jobs/
-│   │   │   │   ├── page.tsx         # Jobs listing
-│   │   │   │   ├── create/page.tsx  # Job creation wizard
-│   │   │   │   └── [id]/
-│   │   │   │       ├── shortlist/page.tsx  # AI screening results
-│   │   │   │       └── compare/page.tsx    # Candidate face-off
-│   │   │   ├── candidates/
-│   │   │   │   ├── page.tsx         # Candidates list
-│   │   │   │   └── upload/page.tsx  # Bulk candidate upload
-│   │   │   ├── layout.tsx           # Root layout (sidebar + topbar)
-│   │   │   ├── globals.css          # Design tokens + styles
-│   │   │   └── page.tsx             # Redirect to /dashboard
+│   │   │   ├── login/         # Recruiter sign-in
+│   │   │   ├── dashboard/
+│   │   │   ├── jobs/          # List, create, edit, shortlist, compare
+│   │   │   ├── candidates/    # List + bulk upload (PDF/CSV/Drive)
+│   │   │   ├── shortlisted/   # Top-N across all jobs
+│   │   │   └── layout.tsx
 │   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   │   ├── Sidebar.tsx      # Navigation sidebar
-│   │   │   │   └── Topbar.tsx       # Top navigation bar
-│   │   │   ├── ui/
-│   │   │   │   ├── ScoreBadge.tsx   # Circular score indicator
-│   │   │   │   ├── FilterBar.tsx    # Reusable filter component
-│   │   │   │   ├── LoadingSkeleton.tsx  # Loading states
-│   │   │   │   └── EmptyState.tsx   # Empty data states
-│   │   │   ├── jobs/                # (Job-specific components)
-│   │   │   ├── candidates/          # (Candidate-specific components)
-│   │   │   └── screening/           # (Screening-specific components)
-│   │   ├── store/
-│   │   │   ├── store.ts             # Redux store configuration
-│   │   │   ├── Provider.tsx         # Redux provider wrapper
-│   │   │   ├── hooks.ts            # Typed dispatch/selector hooks
-│   │   │   ├── jobsSlice.ts        # Jobs state + async thunks
-│   │   │   ├── candidatesSlice.ts  # Candidates state
-│   │   │   └── screeningSlice.ts   # Screening results state
-│   │   └── lib/
-│   │       └── api.ts              # Axios instance
-│   ├── public/
-│   │   └── logo.png                # Umurava Lens logo
-│   ├── package.json
-│   └── tsconfig.json
-│
+│   │   │   ├── layout/        # AppShell (auth gate), Sidebar, Topbar
+│   │   │   ├── screening/     # OutreachPanel
+│   │   │   └── ui/
+│   │   ├── store/             # Redux slices (auth, jobs, candidates, screening)
+│   │   ├── hooks/             # useGoogleDrivePicker
+│   │   └── lib/               # axios with JWT interceptor
+│   ├── .env.example
+│   └── vercel.json
+├── render.yaml                # One-click backend deploy blueprint
 └── README.md
 ```
 
 ---
 
-## 🖥 Screens
+## API reference
 
-### 1. Dashboard
-Overview of active jobs, screening progress, quick actions, and top talent highlights.
+All `/api/*` endpoints except `/api/auth/login` and `/api/health` require a
+`Authorization: Bearer <JWT>` header.
 
-### 2. Jobs Listing
-Grid of job cards with status badges, skill tags, applicant counts, and AI screening actions. Includes filters and pagination.
+**Auth**
 
-### 3. Job Creation Wizard
-Multi-step form with:
-- **Step 1**: Core job identity (title, department, description)
-- **Step 2**: AI lens calibration (adjustable scoring weights)
-- **Step 3**: Mandatory technical stack (skill tags)
+- `POST /api/auth/login` → `{ token, user }`
+- `GET  /api/auth/me` → `{ user }`
 
-### 4. Candidate Upload
-Drag-and-drop zone for resume uploads with processing queue, target job selector, and info cards about Neural Data Extraction and Privacy Standards.
+**Jobs**
 
-### 5. Shortlist Results
-Ranked candidate list with:
-- Match scores and circular progress badges
-- Recommendation badges (Hire/Consider/Risky)
-- Expandable strengths and gaps
-- AI recommendation summaries
-- Re-run screening capability
+- `GET /api/jobs` · `POST /api/jobs` · `GET /api/jobs/:id` · `PUT /api/jobs/:id` · `DELETE /api/jobs/:id`
+- `GET /api/jobs/dashboard/stats`
 
-### 6. Candidate Comparison (Face-Off)
-Side-by-side deep comparison showing:
-- Core strengths analysis
-- Technical proficiency bars
-- Gaps & potential risks
-- AI final verdict with actionable next steps
+**Candidates**
 
----
+- `GET /api/candidates` (with `jobId`, `search`, `page`, `limit`, `dateFrom/To`)
+- `POST /api/candidates/upload` (JSON array)
+- `POST /api/candidates/upload/files` (PDF resumes, multipart)
+- `POST /api/candidates/upload/csv` (CSV files, multipart)
+- `GET /api/candidates/:id` · `DELETE /api/candidates/:id` · `DELETE /api/candidates` (bulk via body)
 
-## 🚢 Deployment
+**Screening**
 
-### Backend
-```bash
-cd backend
-npm run build
-npm start
-```
+- `POST /api/screening/run` (body: `{ jobId, candidateIds? }`)
+- `GET  /api/screening/:jobId` (with `minScore`, `recommendation`, `shortlistedOnly`)
+- `GET  /api/screening/shortlisted` (Top-N across all jobs)
+- `GET  /api/screening/compare?candidateIds=id1,id2&jobId=...`
+- `PATCH /api/screening/results/:id/email` — update draft
 
-### Frontend
-```bash
-cd frontend
-npm run build
-npm start
-```
+**Outreach**
 
-### Environment
-- Set `NEXT_PUBLIC_API_URL` to your production backend URL
-- Ensure MongoDB is accessible from the deployment environment
-- Set a valid `GEMINI_API_KEY`
+- `POST /api/outreach/send` (body: `{ screeningResultId, subject?, body? }`)
+- `POST /api/outreach/send/batch` (body: `{ screeningResultIds: [] }`)
 
 ---
 
-## 📝 License
+## Assumptions and limitations
 
-This project is built for Umurava as an AI-powered recruitment screening solution.
+1. **Single-tenant auth.** The hackathon build has a recruiter role only — no multi-tenant
+   workspaces, no per-user permissions beyond `admin` / `recruiter`. Adding RBAC is a small
+   follow-on; the groundwork is in [middleware/auth.ts](backend/src/middleware/auth.ts).
+2. **No public apply page.** The problem statement assumes applicants arrive via Umurava's
+   existing talent platform, so the recruiter is the only user of this UI. Candidate data
+   enters via structured upload, PDFs, CSVs, or the Drive picker.
+3. **OCR not included.** PDF parsing uses text extraction; scanned-image PDFs are rejected
+   with a clear error. Adding Tesseract/Document AI is a swap in
+   `candidateController.extractPdfText()`.
+4. **Email delivery.** With no SMTP env vars set, delivery falls back to Ethereal test inboxes
+   so demos are safe. Real delivery is one env change away (set `SMTP_HOST/PORT/USER/PASS`).
+5. **Gemini rate limits.** A single screening request sends every candidate in one prompt; for
+   very large pools (100+) the recruiter should batch or increase model capacity. The `runScreening`
+   endpoint accepts an optional `candidateIds` array so batching can be done client-side without
+   changes.
+6. **AI outputs are stochastic.** Results are seeded with `temperature: 0.1` for near-deterministic
+   behavior, but two identical runs may differ slightly. Re-running a screening is idempotent
+   (old `ScreeningResult`s for the job are cleared first).
+7. **Talent Profile Schema compliance.** Core fields are enforced by the Mongoose schema;
+   extensions (AI scores, shortlist flag, outreach state) are added on the `ScreeningResult`
+   model, not the `Candidate`, so the canonical profile stays clean.
 
 ---
 
-*Built with ❤️ using Next.js, Express, MongoDB, and Google Gemini AI*
+Built for the Umurava AI Hackathon.

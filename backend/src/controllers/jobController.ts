@@ -54,7 +54,10 @@ export const getJobById = async (req: Request, res: Response) => {
 
 export const updateJob = async (req: Request, res: Response) => {
   try {
-    const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const job = await Job.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
     if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
   } catch (error: any) {
@@ -86,10 +89,10 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
       ScreeningResult.aggregate([
         { $group: { _id: null, avg: { $avg: '$score' }, count: { $sum: 1 } } },
       ]),
-      ScreeningResult.find()
+      ScreeningResult.find({ shortlisted: true })
         .sort({ score: -1 })
-        .limit(5)
-        .populate('candidateId', 'fullName currentTitle')
+        .limit(15)
+        .populate('candidateId', 'firstName lastName headline')
         .populate('jobId', 'title'),
     ]);
 
@@ -99,15 +102,19 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
 
     const topTalents = topResults
       .filter((r: any) => r.candidateId)
-      .map((r: any) => ({
-        _id: r._id,
-        candidateId: r.candidateId?._id,
-        jobId: r.jobId?._id,
-        name: r.candidateId?.fullName || 'Unknown',
-        role: r.candidateId?.currentTitle || r.jobId?.title || '',
-        score: r.score,
-        recommendation: r.recommendation,
-      }));
+      .map((r: any) => {
+        const c = r.candidateId;
+        const name = [c?.firstName, c?.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
+        return {
+          _id: r._id,
+          candidateId: c?._id,
+          jobId: r.jobId?._id,
+          name,
+          role: c?.headline || r.jobId?.title || '',
+          score: r.score,
+          recommendation: r.recommendation,
+        };
+      });
 
     res.json({
       activeJobCount: activeJobs,

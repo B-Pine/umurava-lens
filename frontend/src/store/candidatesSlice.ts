@@ -1,26 +1,87 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../lib/api';
 
+export type SkillLevel = 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+export type LanguageProficiency = 'Basic' | 'Conversational' | 'Fluent' | 'Native';
+export type AvailabilityStatus = 'Available' | 'Open to Opportunities' | 'Not Available';
+export type AvailabilityType = 'Full-time' | 'Part-time' | 'Contract';
+
+export interface Skill {
+  name: string;
+  level: SkillLevel;
+  yearsOfExperience: number;
+}
+export interface Language {
+  name: string;
+  proficiency: LanguageProficiency;
+}
+export interface Experience {
+  company: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  technologies: string[];
+  isCurrent: boolean;
+}
+export interface Education {
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  startYear: number;
+  endYear: number;
+}
+export interface Certification {
+  name: string;
+  issuer: string;
+  issueDate: string;
+}
+export interface Project {
+  name: string;
+  description: string;
+  technologies: string[];
+  role: string;
+  link: string;
+  startDate: string;
+  endDate: string;
+}
+export interface Availability {
+  status: AvailabilityStatus;
+  type: AvailabilityType;
+  startDate?: string;
+}
+export interface SocialLinks {
+  linkedin?: string;
+  github?: string;
+  portfolio?: string;
+  [key: string]: string | undefined;
+}
+
 export interface Candidate {
   _id: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  fullName?: string; // virtual
   email: string;
   phone: string;
+  headline: string;
+  bio: string;
   location: string;
-  currentTitle: string;
-  currentCompany: string;
-  summary: string;
-  skills: string[];
-  yearsOfExperience: number;
-  education: { degree: string; institution: string; year: number }[];
-  experience: { title: string; company: string; startDate: string; endDate: string; description: string }[];
-  projects: { name: string; description: string; technologies: string[] }[];
-  certifications: string[];
-  languages: string[];
+  skills: Skill[];
+  languages: Language[];
+  experience: Experience[];
+  education: Education[];
+  certifications: Certification[];
+  projects: Project[];
+  availability: Availability;
+  socialLinks: SocialLinks;
+  yearsOfExperience?: number; // virtual
   resumeUrl: string;
   avatarUrl: string;
+  source: 'Umurava Platform' | 'CSV' | 'PDF' | 'Google Drive' | 'Manual' | 'Direct';
   jobId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface CandidatesState {
@@ -42,7 +103,14 @@ const initialState: CandidatesState = {
 export const fetchCandidates = createAsyncThunk(
   'candidates/fetchCandidates',
   async (
-    params: { jobId?: string; page?: number; dateFrom?: string; dateTo?: string; search?: string; limit?: number } = {}
+    params: {
+      jobId?: string;
+      page?: number;
+      dateFrom?: string;
+      dateTo?: string;
+      search?: string;
+      limit?: number;
+    } = {}
   ) => {
     const res = await api.get('/candidates', { params });
     return res.data;
@@ -78,8 +146,21 @@ export const uploadCandidateFiles = createAsyncThunk(
   async (data: { files: File[]; jobId?: string }) => {
     const formData = new FormData();
     if (data.jobId) formData.append('jobId', data.jobId);
-    data.files.forEach(f => formData.append('files', f));
+    data.files.forEach((f) => formData.append('files', f));
     const res = await api.post('/candidates/upload/files', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  }
+);
+
+export const uploadCandidatesCsv = createAsyncThunk(
+  'candidates/uploadCsv',
+  async (data: { files: File[]; jobId?: string }) => {
+    const formData = new FormData();
+    if (data.jobId) formData.append('jobId', data.jobId);
+    data.files.forEach((f) => formData.append('files', f));
+    const res = await api.post('/candidates/upload/csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;
@@ -92,25 +173,55 @@ const candidatesSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchCandidates.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchCandidates.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchCandidates.fulfilled, (state, action) => {
         state.loading = false;
         state.candidates = action.payload.candidates;
         state.total = action.payload.total;
       })
-      .addCase(fetchCandidates.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Failed'; })
-      .addCase(uploadCandidates.pending, (state) => { state.uploading = true; state.error = null; })
+      .addCase(fetchCandidates.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed';
+      })
+      .addCase(uploadCandidates.pending, (state) => {
+        state.uploading = true;
+        state.error = null;
+      })
       .addCase(uploadCandidates.fulfilled, (state, action) => {
         state.uploading = false;
         state.candidates = [...action.payload.candidates, ...state.candidates];
       })
-      .addCase(uploadCandidates.rejected, (state, action) => { state.uploading = false; state.error = action.error.message || 'Upload failed'; })
-      .addCase(uploadCandidateFiles.pending, (state) => { state.uploading = true; state.error = null; })
+      .addCase(uploadCandidates.rejected, (state, action) => {
+        state.uploading = false;
+        state.error = action.error.message || 'Upload failed';
+      })
+      .addCase(uploadCandidateFiles.pending, (state) => {
+        state.uploading = true;
+        state.error = null;
+      })
       .addCase(uploadCandidateFiles.fulfilled, (state, action) => {
         state.uploading = false;
         state.candidates = [...action.payload.candidates, ...state.candidates];
       })
-      .addCase(uploadCandidateFiles.rejected, (state, action) => { state.uploading = false; state.error = action.error.message || 'File Upload failed'; })
+      .addCase(uploadCandidateFiles.rejected, (state, action) => {
+        state.uploading = false;
+        state.error = action.error.message || 'File Upload failed';
+      })
+      .addCase(uploadCandidatesCsv.pending, (state) => {
+        state.uploading = true;
+        state.error = null;
+      })
+      .addCase(uploadCandidatesCsv.fulfilled, (state, action) => {
+        state.uploading = false;
+        state.candidates = [...action.payload.candidates, ...state.candidates];
+      })
+      .addCase(uploadCandidatesCsv.rejected, (state, action) => {
+        state.uploading = false;
+        state.error = action.error.message || 'CSV Upload failed';
+      })
       .addCase(deleteCandidate.fulfilled, (state, action) => {
         state.candidates = state.candidates.filter((c) => c._id !== action.payload);
         state.total = Math.max(0, state.total - 1);
@@ -124,3 +235,8 @@ const candidatesSlice = createSlice({
 });
 
 export default candidatesSlice.reducer;
+
+export function candidateFullName(c: Pick<Candidate, 'firstName' | 'lastName'> | null | undefined): string {
+  if (!c) return '';
+  return [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
+}

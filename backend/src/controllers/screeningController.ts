@@ -6,7 +6,10 @@ import { screenCandidates } from '../services/geminiService';
 
 export const runScreening = async (req: Request, res: Response) => {
   try {
-    const { jobId } = req.body;
+    const { jobId, candidateIds } = req.body as {
+      jobId: string;
+      candidateIds?: string[];
+    };
 
     if (!jobId) {
       return res.status(400).json({ error: 'jobId is required' });
@@ -17,44 +20,65 @@ export const runScreening = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    const candidates = await Candidate.find({ jobId });
+    // If specific candidates selected, only screen those. Otherwise all for this job.
+    const filter: any = { jobId };
+    if (Array.isArray(candidateIds) && candidateIds.length > 0) {
+      filter._id = { $in: candidateIds };
+    }
+    const candidates = await Candidate.find(filter);
     if (candidates.length === 0) {
       return res.status(400).json({ error: 'No candidates found for this job' });
     }
 
-    // Call Gemini AI for screening
     const aiResults = await screenCandidates(job, candidates);
 
-    // Delete existing results for this job (re-run support)
+    // Normalize + sort by rank
+    const sorted = [...aiResults.candidates].sort((a, b) => a.rank - b.rank);
+
+    // Apply Top-N shortlist cap AND passing score
+    const passingScore = job.passingScore ?? 70;
+    const cap = job.shortlistCap ?? 20;
+
+    const shortlistedIds = new Set(
+      sorted
+        .filter((r) => r.score >= passingScore)
+        .slice(0, cap)
+        .map((r) => r.candidateId)
+    );
+
+    // Clear existing results for this job so re-runs are clean
     await ScreeningResult.deleteMany({ jobId });
 
-    // Save new results
-    const screeningDocs = aiResults.candidates.map((result) => ({
+    const screeningDocs = sorted.map((result) => ({
       jobId,
       candidateId: result.candidateId,
       score: result.score,
       rank: result.rank,
-      strengths: result.strengths,
-      gaps: result.gaps,
-      summary: result.summary,
+      strengths: result.strengths || [],
+      gaps: result.gaps || [],
+      summary: result.summary || '',
       recommendation: result.recommendation,
-      confidence: result.confidence,
-      technicalSkillsScore: result.technicalSkillsScore,
-      experienceScore: result.experienceScore,
-      educationScore: result.educationScore,
-      projectImpactScore: result.projectImpactScore,
+      confidence: result.confidence || 0,
+      technicalSkillsScore: result.technicalSkillsScore || 0,
+      experienceScore: result.experienceScore || 0,
+      educationScore: result.educationScore || 0,
+      projectImpactScore: result.projectImpactScore || 0,
+      shortlisted: shortlistedIds.has(result.candidateId),
+      emailDraft: result.emailDraft || '',
+      emailSubject: result.emailSubject || '',
+      emailStatus: 'not_sent',
+      emailSentAt: null,
     }));
 
     const savedResults = await ScreeningResult.insertMany(screeningDocs);
 
-    // Update job screening stats
     await Job.findByIdAndUpdate(jobId, {
       screenedCount: candidates.length,
-      shortlistedCount: aiResults.candidates.filter((c) => c.recommendation === 'hire').length,
+      shortlistedCount: shortlistedIds.size,
     });
 
     res.json({
-      message: `Screening complete. ${candidates.length} candidates evaluated.`,
+      message: `Screening complete. ${candidates.length} evaluated, ${shortlistedIds.size} shortlisted.`,
       results: savedResults,
     });
   } catch (error: any) {
@@ -69,11 +93,12 @@ export const runScreening = async (req: Request, res: Response) => {
 export const getScreeningResults = async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const { minScore, recommendation } = req.query;
+    const { minScore, recommendation, shortlistedOnly } = req.query;
 
     const filter: any = { jobId };
     if (minScore) filter.score = { $gte: parseInt(minScore as string, 10) };
     if (recommendation) filter.recommendation = recommendation;
+    if (shortlistedOnly === 'true') filter.shortlisted = true;
 
     const results = await ScreeningResult.find(filter)
       .sort({ rank: 1 })
@@ -116,3 +141,35 @@ export const getComparisonData = async (req: Request, res: Response) => {
   }
 };
 
+export const getShortlisted = async (_req: Request, res: Response) => {
+  try {
+    const results = await ScreeningResult.find({ shortlisted: true })
+      .sort({ score: -1 })
+      .populate('candidateId')
+      .populate('jobId');
+    res.json({ results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateEmailDraft = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { emailDraft, emailSubject } = req.body as {
+      emailDraft?: string;
+      emailSubject?: string;
+    };
+    const patch: any = {};
+    if (typeof emailDraft === 'string') patch.emailDraft = emailDraft;
+    if (typeof emailSubject === 'string') patch.emailSubject = emailSubject;
+
+    const updated = await ScreeningResult.findByIdAndUpdate(id, patch, { new: true }).populate(
+      'candidateId'
+    );
+    if (!updated) return res.status(404).json({ error: 'Screening result not found' });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};

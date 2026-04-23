@@ -17,161 +17,165 @@ export default function DashboardPage() {
   const stats = dashboardStats;
 
   return (
-    <div className="space-y-8">
-      {/* Bento Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Stats grid — four equal-width cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {loading && !stats ? (
           <>
             <StatSkeleton />
             <StatSkeleton />
-            <div className="lg:col-span-2"><StatSkeleton /></div>
+            <StatSkeleton />
+            <StatSkeleton />
           </>
         ) : error && !stats ? (
-          <div className="col-span-full bg-error-container/20 p-6 rounded-xl text-error text-center">
-            <span className="material-symbols-outlined mr-2">error</span>
+          <div className="col-span-full bg-error-container/20 p-4 rounded-lg text-error text-sm text-center">
+            <span className="material-symbols-outlined mr-2 align-middle text-base">error</span>
             Failed to load dashboard. Make sure the backend is running.
           </div>
         ) : (
           <>
-            {/* Active Jobs Card */}
-            <div className="col-span-1 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined">work</span>
-                </div>
-                <span className="text-xs font-medium text-on-surface-variant bg-surface-container px-2 py-1 rounded">THIS MONTH</span>
-              </div>
-              <h3 className="text-3xl font-extrabold text-on-surface tracking-tight">{stats?.activeJobCount ?? 24}</h3>
-              <p className="text-sm text-on-surface-variant mt-1">Active Job Listings</p>
-            </div>
-
-            {/* Candidates Screened Card */}
-            <div className="col-span-1 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-10 h-10 rounded-lg bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed">
-                  <span className="material-symbols-outlined">verified_user</span>
-                </div>
-                <span className="text-xs font-medium text-on-surface-variant bg-surface-container px-2 py-1 rounded">AI VERIFIED</span>
-              </div>
-              <h3 className="text-3xl font-extrabold text-on-surface tracking-tight">
-                {stats?.candidatesScreened?.toLocaleString() ?? '1,284'}
-              </h3>
-              <p className="text-sm text-on-surface-variant mt-1">Candidates Screened</p>
-            </div>
-
-            {/* Average Match Score Card */}
-            <div className="col-span-1 md:col-span-1 lg:col-span-2 bg-primary-container p-6 rounded-xl relative overflow-hidden">
-              <div className="relative z-10 flex flex-col justify-between h-full">
-                <div>
-                  <p className="text-on-primary-container text-xs uppercase tracking-widest font-bold">Average Match Score</p>
-                  <h3 className="text-5xl font-extrabold text-white mt-2">
-                    {stats?.averageMatchScore != null ? (
-                      <>{stats.averageMatchScore}<span className="text-lg opacity-50 ml-1">%</span></>
-                    ) : (
-                      <span className="text-2xl opacity-70">No screenings yet</span>
-                    )}
-                  </h3>
-                </div>
-                <div className="mt-4">
-                  <p className="text-on-primary-container text-xs">
-                    {stats?.averageMatchCount
-                      ? `Average across ${stats.averageMatchCount} AI screening${stats.averageMatchCount === 1 ? '' : 's'}`
-                      : 'Run screening on a job to populate this metric'}
-                  </p>
-                </div>
-              </div>
-              <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-secondary/30 blur-[100px] rounded-full" />
-            </div>
+            <StatCard
+              icon="work"
+              label="Active Jobs"
+              value={stats?.activeJobCount ?? 0}
+              iconBg="bg-indigo-50 text-indigo-600"
+            />
+            <StatCard
+              icon="group"
+              label="Candidates Screened"
+              value={stats?.candidatesScreened ?? 0}
+              iconBg="bg-emerald-50 text-emerald-600"
+            />
+            <StatCard
+              icon="insights"
+              label="Avg Match Score"
+              value={stats?.averageMatchScore != null ? `${stats.averageMatchScore}%` : '—'}
+              iconBg="bg-amber-50 text-amber-600"
+              subtitle={
+                stats?.averageMatchCount
+                  ? `across ${stats.averageMatchCount} screenings`
+                  : 'no screenings yet'
+              }
+            />
+            <StatCard
+              icon="workspace_premium"
+              label="Top Talents"
+              value={stats?.topTalents?.length ?? 0}
+              iconBg="bg-rose-50 text-rose-600"
+            />
           </>
         )}
       </div>
 
-      {/* Dashboard Body */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Body */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Recent Active Jobs */}
-        <section className="lg:col-span-8 space-y-6">
+        <section className="lg:col-span-3 space-y-3">
           <div className="flex justify-between items-end">
             <div>
-              <h2 className="text-2xl font-extrabold text-on-surface">Recent Active Jobs</h2>
-              <p className="text-on-surface-variant text-sm">Monitor screening progress for your current openings</p>
+              <h2 className="text-lg font-extrabold text-on-surface">Recent Active Jobs</h2>
+              <p className="text-on-surface-variant text-xs">
+                Current openings and their screening progress
+              </p>
             </div>
-            <Link href="/jobs" className="text-secondary font-semibold text-sm flex items-center gap-1 hover:underline">
-              View All Jobs <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            <Link
+              href="/jobs"
+              className="text-secondary font-semibold text-xs flex items-center gap-1 hover:underline"
+            >
+              View all
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
             </Link>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2">
             {loading && !stats ? (
               <>
                 <CardSkeleton />
                 <CardSkeleton />
                 <CardSkeleton />
               </>
+            ) : (stats?.recentJobs?.length ?? 0) === 0 ? (
+              <div className="bg-surface-container-lowest rounded-lg p-6 text-center text-sm text-on-surface-variant">
+                No active jobs yet. Create one to get started.
+              </div>
             ) : (
               (stats?.recentJobs || []).map((job: any) => {
-                const progress = job.applicantCount > 0 ? Math.round((job.screenedCount / job.applicantCount) * 100) : 0;
+                const progress =
+                  job.applicantCount > 0
+                    ? Math.round((job.screenedCount / job.applicantCount) * 100)
+                    : 0;
                 return (
-                  <div key={job._id} className="bg-surface-container-lowest p-5 rounded-xl transition-all hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="font-bold text-lg text-on-surface">{job.title}</h4>
-                        <p className="text-on-surface-variant text-sm">{job.location} &bull; {job.employmentType} &bull; {job.salaryRange}</p>
+                  <Link
+                    key={job._id}
+                    href={`/jobs/${job._id}/shortlist`}
+                    className="block bg-surface-container-lowest p-4 rounded-lg hover:shadow-sm transition-all border border-outline-variant/20"
+                  >
+                    <div className="flex justify-between items-start mb-2 gap-3">
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-sm text-on-surface truncate">{job.title}</h4>
+                        <p className="text-on-surface-variant text-xs truncate">
+                          {job.location} · {job.employmentType}
+                        </p>
                       </div>
-                      <span className="material-symbols-outlined text-on-surface-variant cursor-pointer">more_vert</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-semibold mb-1">
-                        <span className="text-on-surface-variant">Screening Progress</span>
-                        <span className="text-secondary">{progress}% Complete</span>
-                      </div>
-                      <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-secondary to-secondary-container rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-                      </div>
-                      <div className="flex justify-between mt-3">
-                        <div className="flex items-center gap-4 text-xs font-medium text-on-surface-variant">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">group</span> {job.applicantCount} Applied
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">check_circle</span> {job.screenedCount} Screened
-                          </span>
-                        </div>
-                        <Link href={`/jobs/${job._id}/shortlist`} className="text-xs font-bold text-secondary-fixed-dim bg-secondary/5 px-3 py-1 rounded-lg hover:bg-secondary/10 transition-colors">
-                          Review Pool
-                        </Link>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
+                          Screened
+                        </p>
+                        <p className="text-sm font-bold text-secondary">
+                          {job.screenedCount}/{job.applicantCount || 0}
+                        </p>
                       </div>
                     </div>
-                  </div>
+                    <div className="h-1 w-full bg-surface-container-high rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-secondary to-secondary-container rounded-full transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </Link>
                 );
               })
             )}
           </div>
         </section>
 
-        {/* Sidebar */}
-        <aside className="lg:col-span-4 space-y-8">
-          {/* Quick Actions */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-extrabold text-on-surface">Quick Actions</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <Link href="/jobs/create" className="flex flex-col items-center justify-center p-4 bg-surface-container-low hover:bg-surface-container rounded-xl transition-all gap-2 text-center group">
-                <span className="material-symbols-outlined text-secondary text-3xl group-hover:scale-110 transition-transform">add_box</span>
-                <span className="text-xs font-bold text-on-surface">Create New Job</span>
+        {/* Right column: Quick Actions + Top Talents */}
+        <aside className="lg:col-span-2 space-y-6">
+          <section className="space-y-3">
+            <h2 className="text-lg font-extrabold text-on-surface">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/jobs/create"
+                className="flex flex-col items-center justify-center p-4 bg-surface-container-lowest hover:bg-surface-container rounded-lg transition-all gap-1 text-center border border-outline-variant/20"
+              >
+                <span className="material-symbols-outlined text-secondary text-2xl">add_box</span>
+                <span className="text-xs font-bold text-on-surface">New Job</span>
               </Link>
-              <Link href="/candidates/upload" className="flex flex-col items-center justify-center p-4 bg-surface-container-low hover:bg-surface-container rounded-xl transition-all gap-2 text-center group">
-                <span className="material-symbols-outlined text-secondary text-3xl group-hover:scale-110 transition-transform">upload_file</span>
-                <span className="text-xs font-bold text-on-surface">Upload Candidates</span>
+              <Link
+                href="/candidates/upload"
+                className="flex flex-col items-center justify-center p-4 bg-surface-container-lowest hover:bg-surface-container rounded-lg transition-all gap-1 text-center border border-outline-variant/20"
+              >
+                <span className="material-symbols-outlined text-secondary text-2xl">upload_file</span>
+                <span className="text-xs font-bold text-on-surface">Upload</span>
               </Link>
             </div>
           </section>
 
-          {/* Top Talent Highlights (from screening results) */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-extrabold text-on-surface">Top Talent Highlights</h2>
+          <section className="space-y-3">
+            <div className="flex justify-between items-end">
+              <h2 className="text-lg font-extrabold text-on-surface">Top Talents</h2>
+              <Link
+                href="/shortlisted"
+                className="text-secondary font-semibold text-xs flex items-center gap-1 hover:underline"
+              >
+                View all
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </Link>
+            </div>
             {stats?.topTalents && stats.topTalents.length > 0 ? (
-              <div className="space-y-3">
+              <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 divide-y divide-outline-variant/10 max-h-[420px] overflow-y-auto">
                 {stats.topTalents.map((talent) => {
-                  const initials = talent.name
+                  const initials = (talent.name || 'A')
                     .split(' ')
                     .map((n) => n[0])
                     .join('')
@@ -181,32 +185,66 @@ export default function DashboardPage() {
                     <Link
                       key={talent._id}
                       href={`/jobs/${talent.jobId}/shortlist`}
-                      className="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 border-l-4 border-secondary hover:shadow-md transition-all"
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-container-low transition-colors"
                     >
-                      <div className="w-12 h-12 rounded-full bg-linear-to-br from-secondary to-secondary-container flex items-center justify-center text-white font-bold text-sm">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-secondary/25 to-secondary-container/30 flex items-center justify-center text-secondary font-bold text-[11px]">
                         {initials}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h5 className="text-sm font-bold text-on-surface truncate">{talent.name}</h5>
-                        <p className="text-[10px] text-on-surface-variant uppercase truncate">{talent.role}</p>
+                        <p className="text-sm font-bold text-on-surface truncate">{talent.name}</p>
+                        <p className="text-[10px] text-on-surface-variant uppercase truncate font-medium">
+                          {talent.role}
+                        </p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-secondary font-extrabold text-lg">{talent.score}</div>
-                        <div className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest">SCORE</div>
-                      </div>
+                      <span className="text-sm font-extrabold text-secondary tabular-nums">
+                        {talent.score}
+                      </span>
                     </Link>
                   );
                 })}
               </div>
             ) : (
-              <div className="bg-surface-container-lowest p-6 rounded-xl text-center text-sm text-on-surface-variant">
-                <span className="material-symbols-outlined text-3xl text-on-surface-variant/60 mb-2 block">insights</span>
-                No screened candidates yet. Run AI screening on a job to see top talent here.
+              <div className="bg-surface-container-lowest rounded-lg p-5 text-center text-xs text-on-surface-variant border border-outline-variant/20">
+                <span className="material-symbols-outlined text-2xl text-on-surface-variant/50 mb-1 block">
+                  insights
+                </span>
+                Run a screening to see top talents here.
               </div>
             )}
           </section>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  iconBg,
+  subtitle,
+}: {
+  icon: string;
+  label: string;
+  value: string | number;
+  iconBg: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="bg-surface-container-lowest p-4 rounded-lg border border-outline-variant/20">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${iconBg}`}>
+          <span className="material-symbols-outlined text-lg">{icon}</span>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          {label}
+        </span>
+      </div>
+      <p className="text-2xl font-extrabold text-on-surface tabular-nums">{value}</p>
+      {subtitle && (
+        <p className="text-[11px] font-medium text-on-surface-variant mt-1 truncate">{subtitle}</p>
+      )}
     </div>
   );
 }

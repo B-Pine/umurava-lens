@@ -48,7 +48,8 @@ export default function ComparePage() {
   useEffect(() => {
     if (candidates.length >= 2) {
       const sorted = [...candidates].sort((a, b) => b.score - a.score);
-      setWinner(sorted[0].candidateId?.fullName || '');
+      const top = sorted[0].candidateId;
+      setWinner(top ? `${top.firstName || ''} ${top.lastName || ''}`.trim() : '');
     }
   }, [candidates]);
 
@@ -129,16 +130,17 @@ export default function ComparePage() {
                   result.recommendation === 'consider' ? 'border-surface-tint' : 'border-error'
                 }`}>
                   <div className="w-full h-full rounded-xl bg-gradient-to-br from-secondary/20 to-secondary-container/30 flex items-center justify-center text-secondary font-bold text-3xl">
-                    {candidate.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                    {`${candidate.firstName?.[0] || ''}${candidate.lastName?.[0] || ''}`.toUpperCase() || '?'}
                   </div>
                 </div>
                 <div className="absolute -bottom-2 -right-2 bg-secondary text-white text-xs font-extrabold px-2 py-1 rounded-md shadow-lg">
                   {result.score}%
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-on-primary-fixed">{candidate.fullName}</h3>
+              <h3 className="text-2xl font-bold text-on-primary-fixed">{`${candidate.firstName} ${candidate.lastName}`.trim()}</h3>
               <p className="text-sm text-on-surface-variant mt-1">
-                {candidate.currentTitle} • {candidate.location?.split(',')[1]?.trim() || candidate.location}
+                {candidate.headline || candidate.email}
+                {candidate.location ? ` • ${candidate.location}` : ''}
               </p>
               <div className={`mt-3 flex items-center gap-2 px-4 py-1.5 rounded-full ${rec.bg} ${rec.text}`}>
                 <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>{rec.icon}</span>

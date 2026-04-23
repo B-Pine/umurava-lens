@@ -50,10 +50,17 @@ export default function JobsPage() {
   }, [openMenuId]);
 
   const handleRunScreening = async (jobId: string) => {
+    const job = jobs.find((j) => j._id === jobId);
     setActiveScreeningId(jobId);
-    await dispatch(runScreening(jobId));
-    setActiveScreeningId(null);
-    router.push(`/jobs/${jobId}/shortlist`);
+    // Don't await — the sticky progress banner shows status globally.
+    // The user is free to navigate; they'll be notified on completion.
+    dispatch(
+      runScreening({
+        jobId,
+        jobTitle: job?.title || 'Job',
+        candidateCount: job?.applicantCount || 0,
+      })
+    ).finally(() => setActiveScreeningId(null));
   };
 
   const handleDeleteJob = async (jobId: string, title: string) => {

@@ -1,6 +1,27 @@
 import { Request, Response } from 'express';
+import { Readable } from 'stream';
+import csv from 'csv-parser';
 import Candidate from '../models/Candidate';
 import Job from '../models/Job';
+import { extractCandidateFromCV, normalizeCandidate } from '../services/geminiService';
+
+// pdf-parse is loaded via require so it works with both old and new versions
+const pdfParseModule = require('pdf-parse');
+const PDFParse = pdfParseModule.PDFParse;
+const pdfParseFn = typeof pdfParseModule === 'function' ? pdfParseModule : null;
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  if (PDFParse) {
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const data = await parser.getText();
+    return data.text || '';
+  }
+  if (pdfParseFn) {
+    const data = await pdfParseFn(buffer);
+    return data.text || '';
+  }
+  throw new Error('No PDF parser available');
+}
 
 export const uploadCandidates = async (req: Request, res: Response) => {
   try {
@@ -10,12 +31,13 @@ export const uploadCandidates = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'candidates array is required' });
     }
 
-    const candidateDocs = candidates.map((c: any) => ({
-      ...c,
+    const normalized = candidates.map((c: any) => ({
+      ...normalizeCandidate(c),
+      source: c.source || 'Umurava Platform',
       jobId: jobId || null,
     }));
 
-    const created = await Candidate.insertMany(candidateDocs);
+    const created = await Candidate.insertMany(normalized, { ordered: false });
 
     if (jobId) {
       await Job.findByIdAndUpdate(jobId, {
@@ -32,9 +54,6 @@ export const uploadCandidates = async (req: Request, res: Response) => {
   }
 };
 
-const { PDFParse } = require('pdf-parse');
-import { extractCandidateFromCV } from '../services/geminiService';
-
 export const uploadCandidateFiles = async (req: Request, res: Response) => {
   try {
     const { jobId } = req.body;
@@ -48,16 +67,22 @@ export const uploadCandidateFiles = async (req: Request, res: Response) => {
     const failed: { file: string; reason: string }[] = [];
 
     for (const file of files) {
-      if (file.mimetype !== 'application/pdf') {
+      if (file.mimetype !== 'application/pdf' && !file.originalname.toLowerCase().endsWith('.pdf')) {
         failed.push({ file: file.originalname, reason: 'Not a PDF file' });
         continue;
       }
       try {
-        const parser = new PDFParse({ data: new Uint8Array(file.buffer) });
-        const data = await parser.getText();
-        const candidateProfile = await extractCandidateFromCV(data.text);
-        candidateProfile.jobId = jobId || null;
-        parsedCandidates.push(candidateProfile);
+        const text = await extractPdfText(file.buffer);
+        if (!text.trim()) {
+          failed.push({ file: file.originalname, reason: 'PDF contains no extractable text' });
+          continue;
+        }
+        const extracted = await extractCandidateFromCV(text);
+        parsedCandidates.push({
+          ...extracted,
+          source: 'PDF',
+          jobId: jobId || null,
+        });
       } catch (err: any) {
         console.error(`Failed to parse ${file.originalname}:`, err?.message || err);
         failed.push({ file: file.originalname, reason: err?.message || 'Parse error' });
@@ -71,7 +96,7 @@ export const uploadCandidateFiles = async (req: Request, res: Response) => {
       });
     }
 
-    const created = await Candidate.insertMany(parsedCandidates);
+    const created = await Candidate.insertMany(parsedCandidates, { ordered: false });
 
     if (jobId) {
       await Job.findByIdAndUpdate(jobId, {
@@ -89,6 +114,141 @@ export const uploadCandidateFiles = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message || 'File parsing failed' });
   }
 };
+
+export const uploadCandidatesCsv = async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.body;
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No CSV files uploaded' });
+    }
+
+    const allRows: any[] = [];
+    const failed: { file: string; reason: string }[] = [];
+
+    for (const file of files) {
+      const isCsv =
+        file.mimetype === 'text/csv' ||
+        file.mimetype === 'application/vnd.ms-excel' ||
+        file.originalname.toLowerCase().endsWith('.csv');
+      if (!isCsv) {
+        failed.push({ file: file.originalname, reason: 'Not a CSV file' });
+        continue;
+      }
+
+      try {
+        const rows = await parseCsvBuffer(file.buffer);
+        for (const row of rows) {
+          const candidate = rowToCandidate(row);
+          if (candidate) allRows.push(candidate);
+        }
+      } catch (err: any) {
+        failed.push({ file: file.originalname, reason: err?.message || 'CSV parse error' });
+      }
+    }
+
+    if (allRows.length === 0) {
+      return res.status(400).json({ error: 'No valid rows found in CSV', failed });
+    }
+
+    const docs = allRows.map((c) => ({
+      ...c,
+      source: 'CSV',
+      jobId: jobId || null,
+    }));
+
+    const created = await Candidate.insertMany(docs, { ordered: false });
+
+    if (jobId) {
+      await Job.findByIdAndUpdate(jobId, { $inc: { applicantCount: created.length } });
+    }
+
+    res.status(201).json({
+      message: `${created.length} candidates imported from CSV`,
+      candidates: created,
+      failed,
+    });
+  } catch (error: any) {
+    console.error('CSV upload error:', error);
+    res.status(500).json({ error: error.message || 'CSV upload failed' });
+  }
+};
+
+function parseCsvBuffer(buffer: Buffer): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const results: any[] = [];
+    Readable.from(buffer)
+      .pipe(csv())
+      .on('data', (row) => results.push(row))
+      .on('end', () => resolve(results))
+      .on('error', reject);
+  });
+}
+
+/**
+ * Flexible CSV column mapping — accepts a variety of common column names and
+ * maps them onto the Talent Profile Schema. Comma-separated list columns are
+ * split on commas and semicolons.
+ */
+function rowToCandidate(row: Record<string, string>): any | null {
+  const get = (...keys: string[]): string => {
+    for (const k of keys) {
+      for (const actual of Object.keys(row)) {
+        if (actual.toLowerCase().trim() === k.toLowerCase()) {
+          return (row[actual] || '').toString().trim();
+        }
+      }
+    }
+    return '';
+  };
+
+  const fullName = get('full name', 'name', 'fullname');
+  let firstName = get('first name', 'firstname', 'given name');
+  let lastName = get('last name', 'lastname', 'surname', 'family name');
+  if (!firstName && fullName) {
+    const parts = fullName.split(/\s+/);
+    firstName = parts[0] || '';
+    lastName = parts.slice(1).join(' ');
+  }
+
+  const email = get('email', 'e-mail', 'mail');
+  if (!email && !firstName) return null;
+
+  const splitList = (v: string) =>
+    v
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const skillsRaw = splitList(get('skills', 'skill'));
+  const languagesRaw = splitList(get('languages', 'language'));
+
+  return normalizeCandidate({
+    firstName,
+    lastName,
+    email,
+    phone: get('phone', 'tel', 'mobile'),
+    headline: get('headline', 'title', 'current title', 'role'),
+    bio: get('bio', 'summary', 'about'),
+    location: get('location', 'city', 'country'),
+    skills: skillsRaw.map((name) => ({ name, level: 'Intermediate', yearsOfExperience: 0 })),
+    languages: languagesRaw.map((name) => ({ name, proficiency: 'Conversational' })),
+    education: [],
+    experience: [],
+    projects: [],
+    certifications: [],
+    availability: {
+      status: 'Open to Opportunities',
+      type: 'Full-time',
+    },
+    socialLinks: {
+      linkedin: get('linkedin', 'linkedin url'),
+      github: get('github', 'github url'),
+      portfolio: get('portfolio', 'website'),
+    },
+  });
+}
 
 export const getCandidates = async (req: Request, res: Response) => {
   try {
@@ -109,11 +269,11 @@ export const getCandidates = async (req: Request, res: Response) => {
     if (search) {
       const re = new RegExp((search as string).trim(), 'i');
       filter.$or = [
-        { fullName: re },
+        { firstName: re },
+        { lastName: re },
         { email: re },
-        { currentTitle: re },
-        { currentCompany: re },
-        { skills: re },
+        { headline: re },
+        { 'skills.name': re },
       ];
     }
 
@@ -184,3 +344,4 @@ export const deleteCandidates = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+

@@ -1,5 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type Recommendation = 'hire' | 'consider' | 'risky';
+export type EmailStatus = 'not_sent' | 'sent' | 'failed';
+
 export interface IScreeningResult extends Document {
   jobId: mongoose.Types.ObjectId;
   candidateId: mongoose.Types.ObjectId;
@@ -8,12 +11,17 @@ export interface IScreeningResult extends Document {
   strengths: string[];
   gaps: string[];
   summary: string;
-  recommendation: 'hire' | 'consider' | 'risky';
+  recommendation: Recommendation;
   confidence: number;
   technicalSkillsScore: number;
   experienceScore: number;
   educationScore: number;
   projectImpactScore: number;
+  shortlisted: boolean;
+  emailDraft: string;
+  emailSubject: string;
+  emailStatus: EmailStatus;
+  emailSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +45,15 @@ const ScreeningResultSchema = new Schema<IScreeningResult>(
     experienceScore: { type: Number, default: 0, min: 0, max: 100 },
     educationScore: { type: Number, default: 0, min: 0, max: 100 },
     projectImpactScore: { type: Number, default: 0, min: 0, max: 100 },
+    shortlisted: { type: Boolean, default: false, index: true },
+    emailDraft: { type: String, default: '' },
+    emailSubject: { type: String, default: '' },
+    emailStatus: {
+      type: String,
+      enum: ['not_sent', 'sent', 'failed'],
+      default: 'not_sent',
+    },
+    emailSentAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

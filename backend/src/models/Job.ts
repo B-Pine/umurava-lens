@@ -16,6 +16,9 @@ export interface IJob extends Document {
     educationCredentials: number;
     pastProjectImpact: number;
   };
+  passingScore: number;
+  shortlistCap: 10 | 20;
+  applicationDeadline: string;
   applicantCount: number;
   shortlistedCount: number;
   screenedCount: number;
@@ -48,6 +51,9 @@ const JobSchema = new Schema<IJob>(
       educationCredentials: { type: Number, default: 25, min: 0, max: 100 },
       pastProjectImpact: { type: Number, default: 70, min: 0, max: 100 },
     },
+    passingScore: { type: Number, default: 70, min: 0, max: 100 },
+    shortlistCap: { type: Number, enum: [10, 20], default: 20 },
+    applicationDeadline: { type: String, default: '' },
     applicantCount: { type: Number, default: 0 },
     shortlistedCount: { type: Number, default: 0 },
     screenedCount: { type: Number, default: 0 },

@@ -18,6 +18,9 @@ export interface Job {
     educationCredentials: number;
     pastProjectImpact: number;
   };
+  passingScore: number;
+  shortlistCap: 10 | 20;
+  applicationDeadline: string;
   applicantCount: number;
   shortlistedCount: number;
   screenedCount: number;
@@ -73,7 +76,9 @@ export const fetchDashboardStats = createAsyncThunk('jobs/fetchDashboardStats', 
 
 export const fetchJobs = createAsyncThunk(
   'jobs/fetchJobs',
-  async (params: { status?: string; page?: number; limit?: number; sort?: string } = {}) => {
+  async (
+    params: { status?: string; page?: number; limit?: number; sort?: string } = {}
+  ) => {
     const res = await api.get('/jobs', { params });
     return res.data;
   }
@@ -112,10 +117,22 @@ const jobsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchDashboardStats.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(fetchDashboardStats.fulfilled, (state, action) => { state.loading = false; state.dashboardStats = action.payload; })
-      .addCase(fetchDashboardStats.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Failed to fetch stats'; })
-      .addCase(fetchJobs.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchDashboardStats.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchDashboardStats.fulfilled, (state, action) => {
+        state.loading = false;
+        state.dashboardStats = action.payload;
+      })
+      .addCase(fetchDashboardStats.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch stats';
+      })
+      .addCase(fetchJobs.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchJobs.fulfilled, (state, action) => {
         state.loading = false;
         state.jobs = action.payload.jobs;
@@ -123,10 +140,19 @@ const jobsSlice = createSlice({
         state.page = action.payload.page;
         state.totalPages = action.payload.totalPages;
       })
-      .addCase(fetchJobs.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Failed to fetch jobs'; })
-      .addCase(fetchJobById.fulfilled, (state, action) => { state.currentJob = action.payload; })
-      .addCase(createJob.fulfilled, (state, action) => { state.jobs.unshift(action.payload); })
-      .addCase(deleteJob.fulfilled, (state, action) => { state.jobs = state.jobs.filter((j) => j._id !== action.payload); });
+      .addCase(fetchJobs.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch jobs';
+      })
+      .addCase(fetchJobById.fulfilled, (state, action) => {
+        state.currentJob = action.payload;
+      })
+      .addCase(createJob.fulfilled, (state, action) => {
+        state.jobs.unshift(action.payload);
+      })
+      .addCase(deleteJob.fulfilled, (state, action) => {
+        state.jobs = state.jobs.filter((j) => j._id !== action.payload);
+      });
   },
 });
 
