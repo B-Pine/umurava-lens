@@ -34,88 +34,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 mesh-bg">
-      {/* Left — poetic brand panel */}
-      <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 text-white p-12 relative overflow-hidden">
-        <div className="absolute -top-40 -left-24 w-[420px] h-[420px] rounded-full bg-indigo-400/30 blur-[120px] aurora-slow" />
-        <div className="absolute -bottom-32 -right-20 w-[480px] h-[480px] rounded-full bg-fuchsia-500/25 blur-[140px] aurora-slow" style={{ animationDelay: '-6s' }} />
-        <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-sky-400/15 blur-[100px] aurora-slow" style={{ animationDelay: '-12s' }} />
-
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="relative"
-        >
-          <div className="flex items-center gap-3 mb-14">
-            <div className="relative">
-              <div className="absolute inset-0 bg-white/40 blur-xl rounded-full" />
-              <div className="relative w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xl border border-white/20 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  visibility
-                </span>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-lg font-extrabold leading-tight tracking-tight">Umurava Lens</h1>
-              <p className="text-[10px] uppercase tracking-[0.22em] text-white/60 font-bold">
-                AI Talent Intelligence
-              </p>
-            </div>
-          </div>
-
-          <h2 className="text-5xl xl:text-6xl font-extrabold leading-[1.02] tracking-tight">
-            Screen smarter.<br />
-            Hire with context.
-          </h2>
-          <p className="text-white/75 font-medium text-lg max-w-md mt-6 leading-relaxed">
-            Evaluate an entire candidate pool in one pass, see why each person matches,
-            and let your team make the call.
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="relative space-y-4 text-white/85 text-sm font-medium"
-        >
-          {[
-            'Evaluate dozens of applicants in one pass',
-            'Explainable strengths and gaps per candidate',
-            'Review every outreach before it sends',
-          ].map((line, i) => (
-            <motion.div
-              key={line}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.35 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center gap-3"
-            >
-              <span className="material-symbols-outlined text-white/70 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                check_circle
-              </span>
-              {line}
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-
-      {/* Right — form */}
-      <div className="flex items-center justify-center p-8">
+    <div className="min-h-screen flex items-center justify-center mesh-bg w-full">
+      <div className="flex w-full items-center justify-center p-6 sm:p-8">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-md"
         >
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                visibility
-              </span>
-            </div>
-            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Umurava Lens</h1>
+          <div className="flex items-center gap-4 mb-10">
+            <img src="/logo.jpg" alt="Umurava Logo" className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl object-cover shadow-sm" />
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Umurava Lens</h1>
           </div>
 
           <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">Welcome back</h2>
@@ -193,13 +122,6 @@ export default function LoginPage() {
             </motion.button>
           </form>
 
-          <div className="mt-10 p-4 bg-slate-100/70 backdrop-blur border border-slate-200/70 rounded-xl text-xs text-slate-500 font-medium leading-relaxed">
-            <p className="font-bold text-slate-700 mb-1">Demo credentials</p>
-            The seeded admin account is{' '}
-            <span className="font-mono text-slate-700">admin@umurava.africa</span>. The password is
-            defined by the <span className="font-mono">SEED_ADMIN_PASSWORD</span> env var (default{' '}
-            <span className="font-mono text-slate-700">umurava-admin-2026</span>).
-          </div>
         </motion.div>
       </div>
     </div>

@@ -248,6 +248,7 @@ cd frontend && npm run dev
 ```
 
 Sign in at http://localhost:3000/login with the seeded credentials.
+(Default: **`admin@umurava.africa`** / **`umurava-admin-2026`**)
 
 ---
 

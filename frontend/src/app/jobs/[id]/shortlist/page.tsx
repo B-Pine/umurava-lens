@@ -28,12 +28,6 @@ export default function ShortlistPage() {
     dispatch(fetchScreeningResults({ jobId }));
   }, [dispatch, jobId]);
 
-  useEffect(() => {
-    if (results.length > 0 && !selectedId) {
-      setSelectedId(results[0]._id);
-    }
-  }, [results, selectedId]);
-
   const filtered = results.filter((r) => {
     if (filter === 'shortlisted') return r.shortlisted;
     if (filter === 'top10') return r.rank <= 10;
@@ -246,7 +240,7 @@ export default function ShortlistPage() {
                       exit={{ opacity: 0, x: -8 }}
                       transition={{ delay: Math.min(idx * 0.02, 0.2), duration: 0.22 }}
                       onClick={() => setSelectedId(r._id)}
-                      className={`w-full flex items-center gap-2 px-2.5 py-2 text-left transition-colors border-b border-slate-100/60 ${
+                      className={`group w-full flex items-center gap-2 px-2.5 py-2 text-left transition-colors border-b border-slate-100/60 ${
                         isActive ? 'bg-indigo-50/70' : 'hover:bg-white/60'
                       }`}
                     >
@@ -260,7 +254,7 @@ export default function ShortlistPage() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {r.emailStatus === 'sent' && (
-                          <span className="material-symbols-outlined text-[11px] text-emerald-500" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
+                          <span className={`material-symbols-outlined text-[10px] text-emerald-500 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
                         )}
                         <span className={`text-[12px] font-extrabold tabular-nums ${scoreColor(r.score)}`}>{r.score}</span>
                       </div>
@@ -353,29 +347,103 @@ function CandidateDetail({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-4">
-          {/* Score Breakdown + Meta */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {[
-              { label: 'Technical', value: result.technicalSkillsScore },
-              { label: 'Experience', value: result.experienceScore },
-              { label: 'Education', value: result.educationScore },
-              { label: 'Projects', value: result.projectImpactScore },
-            ].map((item) => (
-              <div key={item.label} className="bg-white/70 border border-slate-100 rounded-lg p-2.5">
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                  <p className="text-[13px] font-extrabold text-slate-900 tabular-nums">{item.value}</p>
-                </div>
-                <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full rounded-full ${barColor(item.value)}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${item.value}%` }}
-                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                  />
-                </div>
+          {/* Top Row: AI Evaluation & Candidate Profile */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* Score Breakdown */}
+            <div className="bg-white/70 border border-slate-100 rounded-lg p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-4">AI Evaluation Criteria</p>
+              <div className="space-y-3.5">
+                {[
+                  { label: 'Technical Skills', value: result.technicalSkillsScore },
+                  { label: 'Experience Level', value: result.experienceScore },
+                  { label: 'Education Quality', value: result.educationScore },
+                  { label: 'Project Impact', value: result.projectImpactScore },
+                ].map((item) => (
+                  <div key={item.label}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold text-slate-700">{item.label}</span>
+                      <span className="text-[11px] font-extrabold text-slate-900 tabular-nums">{item.value}/100</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-indigo-600"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${item.value}%` }}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Candidate Profile */}
+            {c ? (
+              <div className="bg-white/70 border border-slate-100 rounded-lg p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-3 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[12px]">badge</span>
+                  Candidate Profile
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  {c.email && (
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Email</p>
+                      <p className="text-slate-700 font-medium truncate" title={c.email}>{c.email}</p>
+                    </div>
+                  )}
+                  {c.phone && (
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Phone</p>
+                      <p className="text-slate-700 font-medium">{c.phone}</p>
+                    </div>
+                  )}
+                  {c.location && (
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Location</p>
+                      <p className="text-slate-700 font-medium">{c.location}</p>
+                    </div>
+                  )}
+                  {c.source && (
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Source</p>
+                      <p className="text-slate-700 font-medium">{c.source}</p>
+                    </div>
+                  )}
+                </div>
+                {/* Skills */}
+                {c.skills && c.skills.length > 0 && (
+                  <div className="mt-3.5">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Skills</p>
+                    <div className="flex flex-wrap gap-1">
+                      {c.skills.map((s: any, i: number) => (
+                        <span key={i} className="inline-flex items-center h-5 px-2 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[9px] font-semibold">
+                          {s.name || s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Social */}
+                {(c.socialLinks?.linkedin || c.socialLinks?.github) && (
+                  <div className="mt-3.5 flex gap-3">
+                    {c.socialLinks.linkedin && (
+                      <a href={c.socialLinks.linkedin} target="_blank" rel="noopener" className="text-[10px] font-semibold text-indigo-600 hover:underline flex items-center gap-0.5">
+                        LinkedIn <span className="material-symbols-outlined text-[10px]">open_in_new</span>
+                      </a>
+                    )}
+                    {c.socialLinks.github && (
+                      <a href={c.socialLinks.github} target="_blank" rel="noopener" className="text-[10px] font-semibold text-slate-600 hover:underline flex items-center gap-0.5">
+                        GitHub <span className="material-symbols-outlined text-[10px]">open_in_new</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white/70 border border-slate-100 rounded-lg p-4 flex items-center justify-center">
+                <p className="text-[11px] text-slate-400 font-medium">Profile data missing</p>
+              </div>
+            )}
           </div>
 
           {/* Rank + Confidence + Status row */}
@@ -399,8 +467,7 @@ function CandidateDetail({
           {/* Strengths + Gaps side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="bg-white/70 border border-emerald-100 rounded-lg p-3">
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-700 flex items-center gap-1 mb-2">
-                <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-700 mb-2">
                 Strengths
               </p>
               <ul className="space-y-1.5 text-[11px] text-slate-700 font-medium">
@@ -413,8 +480,7 @@ function CandidateDetail({
               </ul>
             </div>
             <div className="bg-white/70 border border-amber-100 rounded-lg p-3">
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-700 flex items-center gap-1 mb-2">
-                <span className="material-symbols-outlined text-[12px]">warning</span>
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-700 mb-2">
                 Gaps
               </p>
               <ul className="space-y-1.5 text-[11px] text-slate-700 font-medium">
@@ -433,70 +499,6 @@ function CandidateDetail({
             <div className="bg-indigo-50/60 border-l-2 border-indigo-500 rounded-r-lg p-3">
               <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-indigo-700 mb-1">AI Summary</p>
               <p className="text-[11px] text-slate-700 leading-relaxed font-medium">{result.summary}</p>
-            </div>
-          )}
-
-          {/* Candidate Profile */}
-          {c && (
-            <div className="bg-white/70 border border-slate-100 rounded-lg p-3">
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-2 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">badge</span>
-                Profile
-              </p>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-[11px]">
-                {c.email && (
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Email</p>
-                    <p className="text-slate-700 font-medium truncate">{c.email}</p>
-                  </div>
-                )}
-                {c.phone && (
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Phone</p>
-                    <p className="text-slate-700 font-medium">{c.phone}</p>
-                  </div>
-                )}
-                {c.location && (
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Location</p>
-                    <p className="text-slate-700 font-medium">{c.location}</p>
-                  </div>
-                )}
-                {c.source && (
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Source</p>
-                    <p className="text-slate-700 font-medium">{c.source}</p>
-                  </div>
-                )}
-              </div>
-              {/* Skills */}
-              {c.skills && c.skills.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Skills</p>
-                  <div className="flex flex-wrap gap-1">
-                    {c.skills.map((s: any, i: number) => (
-                      <span key={i} className="inline-flex items-center h-5 px-2 rounded-full bg-indigo-600 text-white text-[9px] font-semibold">
-                        {s.name || s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Social */}
-              {(c.socialLinks?.linkedin || c.socialLinks?.github) && (
-                <div className="mt-3 flex gap-3">
-                  {c.socialLinks.linkedin && (
-                    <a href={c.socialLinks.linkedin} target="_blank" rel="noopener" className="text-[10px] font-semibold text-indigo-600 hover:underline flex items-center gap-0.5">
-                      LinkedIn <span className="material-symbols-outlined text-[10px]">open_in_new</span>
-                    </a>
-                  )}
-                  {c.socialLinks.github && (
-                    <a href={c.socialLinks.github} target="_blank" rel="noopener" className="text-[10px] font-semibold text-slate-600 hover:underline flex items-center gap-0.5">
-                      GitHub <span className="material-symbols-outlined text-[10px]">open_in_new</span>
-                    </a>
-                  )}
-                </div>
-              )}
             </div>
           )}
 

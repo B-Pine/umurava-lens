@@ -18,6 +18,10 @@ export default function JobDetailsPage() {
     const fetchJob = async () => {
       try {
         const response = await api.get(`/jobs/${id}`);
+        if (response.data.status === 'draft') {
+          router.replace(`/jobs/${id}/edit?publish=1`);
+          return;
+        }
         setJob(response.data);
       } catch (err: any) {
         setError(err.response?.data?.error || 'Failed to load job');
@@ -87,7 +91,7 @@ export default function JobDetailsPage() {
       : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-6xl mx-auto w-full">
       {/* HEADER */}
       <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
@@ -363,37 +367,7 @@ export default function JobDetailsPage() {
             </div>
           </motion.section>
 
-          {/* Quick Actions */}
-          <motion.section
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="glass-panel rounded-xl p-4"
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-indigo-600 text-[16px]">bolt</span>
-              <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Quick Actions</h2>
-            </div>
-            <div className="space-y-1">
-              {[
-                { href: '/candidates/upload', label: 'Upload candidates', icon: 'upload_file', iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600' },
-                { href: `/jobs/${job._id}/shortlist`, label: 'View shortlist', icon: 'workspace_premium', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
-                { href: `/jobs/${job._id}/compare`, label: 'Compare candidates', icon: 'compare_arrows', iconBg: 'bg-violet-50', iconColor: 'text-violet-600' },
-                { href: `/jobs/${job._id}/edit`, label: 'Edit job details', icon: 'edit', iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
-              ].map((a) => (
-                <Link
-                  key={a.href}
-                  href={a.href}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-slate-700 hover:bg-white/70 border border-transparent hover:border-slate-200/60 transition-all"
-                >
-                  <span className={`w-6 h-6 rounded-md ${a.iconBg} flex items-center justify-center shrink-0`}>
-                    <span className={`material-symbols-outlined text-[13px] ${a.iconColor}`}>{a.icon}</span>
-                  </span>
-                  {a.label}
-                </Link>
-              ))}
-            </div>
-          </motion.section>
+
 
           {/* Timeline */}
           {(job.applicationDeadline || job.createdAt) && (

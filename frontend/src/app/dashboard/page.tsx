@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const pipe = stats?.pipeline || { applied: 0, screened: 0, shortlisted: 0 };
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* HERO */}
       <section className="relative overflow-hidden rounded-2xl glass-panel p-5">
         <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-70">
@@ -206,7 +206,7 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="lg:col-span-7 space-y-2"
+          className="lg:col-span-6 space-y-3"
         >
           <div className="flex items-end justify-between px-0.5">
             <div>
@@ -290,7 +290,7 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.34, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="lg:col-span-5 space-y-2"
+          className="lg:col-span-6 space-y-3"
         >
           <div className="flex items-end justify-between px-0.5">
             <div>
@@ -308,7 +308,7 @@ export default function DashboardPage() {
 
           {stats?.topTalents && stats.topTalents.length > 0 ? (
             <div className="glass-panel rounded-xl divide-y divide-slate-100/70 max-h-[420px] overflow-y-auto">
-              {stats.topTalents.map((t, idx) => {
+              {stats.topTalents.slice(0, 5).map((t, idx) => {
                 const initials = (t.name || 'A')
                   .split(' ')
                   .map((n) => n[0])

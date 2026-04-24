@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch } from '../../../store/hooks';
 import { createJob } from '../../../store/jobsSlice';
 
@@ -51,6 +51,8 @@ export default function CreateJobPage() {
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
+  const [currentStep, setCurrentStep] = useState(1);
+
   const addSkill = (skill: string) => {
     const trimmed = skill.trim();
     if (trimmed && !skills.find((s) => s.toLowerCase() === trimmed.toLowerCase())) {
@@ -70,16 +72,31 @@ export default function CreateJobPage() {
   const step1Valid = Object.values(step1Err).every((e) => !e);
   const step3Valid = Object.values(step3Err).every((e) => !e);
 
+  const handleNextStep = () => {
+    if (currentStep === 1 && !step1Valid) {
+      setShowErrors(true);
+    } else {
+      setCurrentStep(currentStep + 1);
+      setShowErrors(false);
+    }
+  };
+
   const handleSubmit = async (asDraft: boolean) => {
     if (asDraft) {
       if (!title.trim()) {
         setShowErrors(true);
+        setCurrentStep(1);
         return;
       }
     } else {
-      if (!step1Valid || !step3Valid) {
+      if (!step1Valid) {
         setShowErrors(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setCurrentStep(1);
+        return;
+      }
+      if (!step3Valid) {
+        setShowErrors(true);
+        setCurrentStep(3);
         return;
       }
     }
@@ -110,93 +127,144 @@ export default function CreateJobPage() {
     }
   };
 
+  const steps = [
+    { num: 1, label: 'Job details', icon: 'description' },
+    { num: 2, label: 'AI weighting', icon: 'tune' },
+    { num: 3, label: 'Skills config', icon: 'terminal' },
+  ];
+
   return (
-    <div className="space-y-4 w-full">
+    <div className="space-y-4 w-full max-w-5xl mx-auto">
       {/* HEADER */}
       <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <nav className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+          <nav className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
             <Link href="/jobs" className="hover:text-slate-900 transition-colors">Jobs</Link>
-            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            <span className="material-symbols-outlined text-[10px] md:text-[12px]">chevron_right</span>
             <span className="text-indigo-700">New role</span>
           </nav>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-tight">Define the role</h1>
-          <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+          <h1 className="text-[18px] md:text-2xl font-extrabold tracking-tight text-slate-900 leading-tight">Define the role</h1>
+          <p className="text-[10px] md:text-[12px] text-slate-500 font-medium mt-0.5">
             Configure the job spec and how the AI should weight candidates.
           </p>
         </div>
-        <button
-          onClick={() => handleSubmit(true)}
-          disabled={saving || !title.trim()}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed press"
-        >
-          <span className="material-symbols-outlined text-[14px]">save</span>
-          {saving ? 'Saving…' : 'Save draft'}
-        </button>
       </section>
 
-      {/* MAIN CONTENT */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column */}
-        <div className="xl:col-span-2">
-          <Step1
-            title={title}
-            setTitle={setTitle}
-            department={department}
-            setDepartment={setDepartment}
-            employmentType={employmentType}
-            setEmploymentType={setEmploymentType}
-            location={location}
-            setLocation={setLocation}
-            salaryRange={salaryRange}
-            setSalaryRange={setSalaryRange}
-            experienceLevel={experienceLevel}
-            setExperienceLevel={setExperienceLevel}
-            description={description}
-            setDescription={setDescription}
-            applicationDeadline={applicationDeadline}
-            setApplicationDeadline={setApplicationDeadline}
-            showErrors={showErrors}
-            step1Err={step1Err}
-          />
+      {/* MAIN LAYOUT */}
+      <div className="flex flex-col lg:flex-row gap-4 md:gap-5">
+        
+        {/* LEFT PANE: Progress Tracker */}
+        <div className="lg:w-64 shrink-0">
+          <div className="glass-panel p-3 md:p-5 min-h-[100px] lg:min-h-[360px] rounded-xl flex flex-row lg:flex-col gap-2 overflow-x-auto hide-scrollbar">
+            {steps.map(s => {
+              const isActive = currentStep === s.num;
+              const isCompleted = currentStep > s.num;
+              return (
+              <div
+                 key={s.num}
+                 className={`flex items-center gap-3 px-3 py-2.5 md:py-3.5 rounded-xl text-left transition-colors whitespace-nowrap lg:whitespace-normal ${
+                   isActive ? 'bg-indigo-50/80 shadow-[0_1px_2px_0_rgba(70,72,212,0.05)] border border-indigo-100/50' : 'border border-transparent'
+                 }`}
+              >
+                 <div className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                   isActive || isCompleted ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-200 text-slate-500'
+                 }`}>
+                   {isCompleted ? (
+                     <span className="material-symbols-outlined text-[13px] md:text-[15px]" style={{ fontVariationSettings: "'wght' 700" }}>check</span>
+                   ) : (
+                     <span className="text-[10px] md:text-[11px] font-extrabold">{s.num}</span>
+                   )}
+                 </div>
+                 <div className="flex-1">
+                   <p className={`text-[10px] md:text-[11px] font-bold uppercase tracking-widest ${
+                     isActive || isCompleted ? 'text-indigo-900' : 'text-slate-500'
+                   }`}>{s.label}</p>
+                 </div>
+              </div>
+            )})}
+          </div>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          <Step2 weights={weights} setWeights={setWeights} passingScore={passingScore} setPassingScore={setPassingScore} />
-          
-          <Step3
-            skills={skills}
-            removeSkill={removeSkill}
-            addSkill={addSkill}
-            skillInput={skillInput}
-            setSkillInput={setSkillInput}
-            shortlistCap={shortlistCap}
-            setShortlistCap={setShortlistCap}
-            showErrors={showErrors}
-            step3Err={step3Err}
-          />
+        {/* RIGHT PANE */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
+          <AnimatePresence mode="wait">
+            <motion.div
+               key={currentStep}
+               initial={{ opacity: 0, x: 10 }}
+               animate={{ opacity: 1, x: 0 }}
+               exit={{ opacity: 0, x: -10 }}
+               transition={{ duration: 0.2 }}
+            >
+              {currentStep === 1 && (
+                <Step1
+                  title={title} setTitle={setTitle}
+                  department={department} setDepartment={setDepartment}
+                  employmentType={employmentType} setEmploymentType={setEmploymentType}
+                  location={location} setLocation={setLocation}
+                  salaryRange={salaryRange} setSalaryRange={setSalaryRange}
+                  experienceLevel={experienceLevel} setExperienceLevel={setExperienceLevel}
+                  description={description} setDescription={setDescription}
+                  applicationDeadline={applicationDeadline} setApplicationDeadline={setApplicationDeadline}
+                  showErrors={showErrors} step1Err={step1Err}
+                />
+              )}
+              {currentStep === 2 && (
+                <Step2 weights={weights} setWeights={setWeights} passingScore={passingScore} setPassingScore={setPassingScore} />
+              )}
+              {currentStep === 3 && (
+                <Step3
+                  skills={skills} addSkill={addSkill} removeSkill={removeSkill}
+                  skillInput={skillInput} setSkillInput={setSkillInput}
+                  shortlistCap={shortlistCap} setShortlistCap={setShortlistCap}
+                  showErrors={showErrors} step3Err={step3Err}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* ACTION BAR */}
+          <section className="glass-panel rounded-xl p-2 md:p-3 flex flex-row items-center justify-between gap-3">
+             <button
+               onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : router.push('/jobs')}
+               disabled={saving}
+               className="inline-flex items-center h-7 md:h-8 px-3 md:px-4 rounded-lg bg-white border border-slate-200 text-[10px] md:text-[11px] font-bold text-slate-700 hover:border-slate-300 disabled:opacity-40 transition-colors press"
+             >
+               {currentStep === 1 ? 'Cancel' : 'Back'}
+             </button>
+             
+             <div className="flex items-center gap-1.5 md:gap-2">
+               <button
+                 onClick={() => handleSubmit(true)}
+                 disabled={saving || !title.trim()}
+                 className="inline-flex items-center gap-1 md:gap-1.5 h-7 md:h-8 px-2.5 md:px-3 rounded-lg bg-white border border-slate-200 text-[10px] md:text-[11px] font-bold text-slate-700 hover:border-slate-300 disabled:opacity-40 press"
+               >
+                 <span className="material-symbols-outlined text-[12px] md:text-[13px]">save</span>
+                 <span className="hidden sm:inline">{saving ? 'Saving…' : 'Save draft'}</span>
+                 <span className="inline sm:hidden">Draft</span>
+               </button>
+
+               {currentStep < 3 ? (
+                 <button
+                   onClick={handleNextStep}
+                   className="inline-flex items-center gap-1 md:gap-1.5 h-7 md:h-8 px-3 md:px-4 rounded-lg bg-indigo-100 text-indigo-700 text-[10px] md:text-[11px] font-extrabold hover:bg-indigo-200 transition press"
+                 >
+                   Next step
+                   <span className="material-symbols-outlined text-[12px] md:text-[14px]">arrow_forward</span>
+                 </button>
+               ) : (
+                 <button
+                   onClick={() => handleSubmit(false)}
+                   disabled={saving || !step1Valid || !step3Valid}
+                   className="inline-flex items-center gap-1 md:gap-1.5 h-7 md:h-8 px-3 md:px-5 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[10px] md:text-[11px] font-bold shadow-[0_4px_12px_-4px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition press"
+                 >
+                   {saving ? 'Publishing…' : 'Publish role'}
+                   <span className="material-symbols-outlined text-[12px] md:text-[14px]">check</span>
+                 </button>
+               )}
+             </div>
+          </section>
         </div>
       </div>
-
-      {/* FOOTER ACTION BAR */}
-      <section className="glass-panel rounded-xl p-3 flex items-center justify-end gap-3 mt-4">
-        <button
-          onClick={() => router.push('/jobs')}
-          disabled={saving}
-          className="inline-flex items-center h-9 px-4 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-40 transition-colors press"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => handleSubmit(false)}
-          disabled={saving || !step1Valid || !step3Valid}
-          className="inline-flex items-center gap-1.5 h-9 px-5 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition press"
-        >
-          {saving ? 'Publishing…' : 'Publish role'}
-          <span className="material-symbols-outlined text-[15px]">check</span>
-        </button>
-      </section>
     </div>
   );
 }

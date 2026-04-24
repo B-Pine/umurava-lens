@@ -41,24 +41,14 @@ export default function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-52 z-[60] flex flex-col glass-panel rounded-none border-r border-slate-200/60">
       {/* Brand */}
-      <div className="px-4 py-4 border-b border-slate-100/60">
+      <div className="px-4 py-4 border-b border-slate-100/60 flex h-[72px] items-center">
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500/30 blur-xl rounded-full group-hover:bg-indigo-500/50 transition" />
-            <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                visibility
-              </span>
-            </div>
-          </div>
+          <img src="/logo.jpg" alt="Umurava Logo" className="h-10 w-10 rounded-lg object-contain" />
           <div className="min-w-0">
-            <h1 className="text-[13px] font-extrabold text-slate-900 leading-tight font-[family-name:var(--font-headline)] tracking-tight truncate">
+            <h1 className="text-[12px] font-extrabold text-slate-900 leading-tight tracking-tight truncate">
               Umurava Lens
             </h1>
-            <p className="text-[8px] uppercase tracking-[0.22em] text-indigo-600/80 font-bold mt-0.5">
+            <p className="text-[7px] uppercase tracking-[0.22em] text-indigo-600/80 font-bold mt-0.5">
               AI Talent Intelligence
             </p>
           </div>
