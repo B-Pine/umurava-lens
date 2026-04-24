@@ -36,6 +36,8 @@ gaps, and send AI-drafted outreach emails — with the **recruiter always making
 
 ## Table of contents
 
+- [Live demo](#-live-demo)
+
 - [What it does](#what-it-does)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
