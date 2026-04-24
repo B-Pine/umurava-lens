@@ -153,7 +153,7 @@ export async function screenCandidates(
 ): Promise<ScreeningResponse> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.1-flash-lite-preview',
     generationConfig: {
       temperature: 0.1,
       topP: 0.8,
