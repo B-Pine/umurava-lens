@@ -153,7 +153,7 @@ export async function screenCandidates(
 ): Promise<ScreeningResponse> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-flash-latest',
+    model: 'gemini-3.1-flash-lite-preview',
     generationConfig: {
       temperature: 0.1,
       topP: 0.8,
@@ -255,7 +255,7 @@ NOTE: The top ${shortlistCap} candidates by rank will be flagged as "shortlisted
 
 export async function extractCandidateFromCV(text: string): Promise<any> {
   const model = getGeminiClient().getGenerativeModel({
-    model: 'gemini-flash-latest',
+    model: 'gemini-3.1-flash-lite-preview',
     generationConfig: {
       temperature: 0.1,
       responseMimeType: 'application/json',
@@ -336,15 +336,26 @@ CV TEXT:
 ${text.substring(0, 30000)}
 `;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    const data = extractJson(responseText);
-    return normalizeCandidate(data);
-  } catch (error: any) {
-    console.error('Gemini Parse CV Error:', error);
-    throw new Error('Failed to parse CV cleanly.');
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      const data = extractJson(responseText);
+      return normalizeCandidate(data);
+    } catch (error: any) {
+      const isRetryable = error?.status === 503 || error?.status === 429;
+      console.error(`Gemini Parse CV Error (attempt ${attempt}/${MAX_RETRIES}):`, error?.message || error);
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
+        console.log(`Retrying in ${delay / 1000}s...`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw new Error(`Failed to parse CV: ${error?.message || 'Unknown Gemini error'}`);
+    }
   }
+  throw new Error('Failed to parse CV after maximum retries.');
 }
 
 /**
