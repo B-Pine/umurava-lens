@@ -122,6 +122,12 @@ implements the full Umurava Talent Profile Schema verbatim:
 Required fields are enforced at the model level. CSV/PDF ingestion runs every candidate through
 `normalizeCandidate()` to guarantee enum correctness before insertion.
 
+### Compliance with Section 4: Extensibility
+Per the official specification, we left all core structured fields completely unmodified. However, we robustly **extended** the schema mathematically and architecturally to support the AI engine:
+- **Computed Attributes:** Added strict aggregations like total `yearsOfExperience` calculating natively off the `experience[].startDate` and `endDate`.
+- **System Metadata:** Added `resumeUrl`, `avatarUrl`, `phone`, and `source` tags.
+- **AI Screening Results Model:** Instead of bloating the core Profile Schema, we built a dedicated 1-to-1 `ScreeningResult` relational schema. This securely houses the **AI-generated scores** (sub-scores for technical, experience, education, impact), along with the AI reasoning (strengths/gaps) and email outreach drafts, keeping the raw Talent Profile pristine as requested.
+
 ---
 
 ## AI decision flow
