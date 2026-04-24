@@ -2,20 +2,41 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { motion } from 'motion/react';
 import { useAppDispatch } from '../../../store/hooks';
 import { createJob } from '../../../store/jobsSlice';
+
+const DEPARTMENTS = [
+  'Engineering & Data Science',
+  'Product Development',
+  'Executive Leadership',
+  'Operations',
+  'Design',
+  'Sales & Marketing',
+];
+
+const EMPLOYMENT_TYPES = ['Full-time Permanent', 'Part-time', 'Contract (Long term)', 'Interim Leadership', 'Internship'];
+const EXPERIENCE_LEVELS = ['Junior', 'Mid-level', 'Senior', 'Director', 'Executive'];
+
+const WEIGHT_KEYS = [
+  { key: 'technicalSkills', label: 'Technical Skills', hint: 'Verified code & platform proficiency' },
+  { key: 'yearsOfExperience', label: 'Years of Experience', hint: 'Tenure and progression' },
+  { key: 'educationCredentials', label: 'Education', hint: 'Degrees and institutions' },
+  { key: 'pastProjectImpact', label: 'Project Impact', hint: 'Portfolio and outcomes' },
+] as const;
 
 export default function CreateJobPage() {
   const dispatch = useAppDispatch();
   const router = useRouter();
 
   const [title, setTitle] = useState('');
-  const [department, setDepartment] = useState('Engineering & Data Science');
-  const [employmentType, setEmploymentType] = useState('Full-time Permanent');
+  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  const [employmentType, setEmploymentType] = useState(EMPLOYMENT_TYPES[0]);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [salaryRange, setSalaryRange] = useState('');
-  const [experienceLevel, setExperienceLevel] = useState('Senior');
+  const [experienceLevel, setExperienceLevel] = useState('Mid-level');
   const [skills, setSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
   const [weights, setWeights] = useState({
@@ -24,33 +45,31 @@ export default function CreateJobPage() {
     educationCredentials: 25,
     pastProjectImpact: 70,
   });
+  const [passingScore, setPassingScore] = useState<number>(70);
+  const [shortlistCap, setShortlistCap] = useState<10 | 20>(20);
+  const [applicationDeadline, setApplicationDeadline] = useState('');
   const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [showErrors, setShowErrors] = useState(false);
 
   const addSkill = (skill: string) => {
     const trimmed = skill.trim();
-    if (trimmed && !skills.includes(trimmed)) {
+    if (trimmed && !skills.find((s) => s.toLowerCase() === trimmed.toLowerCase())) {
       setSkills([...skills, trimmed]);
     }
     setSkillInput('');
   };
+  const removeSkill = (skill: string) => setSkills(skills.filter((s) => s !== skill));
 
-  const removeSkill = (skill: string) => {
-    setSkills(skills.filter((s) => s !== skill));
-  };
-
-  const step1Errors = {
+  const step1Err = {
     title: !title.trim() ? 'Job title is required' : '',
     description: !description.trim() ? 'Job description is required' : '',
     location: !location.trim() ? 'Location is required' : '',
     salaryRange: !salaryRange.trim() ? 'Salary range is required' : '',
   };
-  const step3Errors = {
-    skills: skills.length === 0 ? 'Add at least one required skill' : '',
-  };
-  const step1Valid = Object.values(step1Errors).every((e) => !e);
-  const step3Valid = Object.values(step3Errors).every((e) => !e);
-  const [showErrors, setShowErrors] = useState(false);
+  const step3Err = { skills: skills.length === 0 ? 'Add at least one required skill' : '' };
+  const step1Valid = Object.values(step1Err).every((e) => !e);
+  const step3Valid = Object.values(step3Err).every((e) => !e);
 
   const handleNext = () => {
     if (step === 1 && !step1Valid) {
@@ -58,15 +77,16 @@ export default function CreateJobPage() {
       return;
     }
     setShowErrors(false);
-    setStep(step + 1);
+    setStep((s) => (Math.min(s + 1, 3) as 1 | 2 | 3));
   };
+
+  const handleBack = () => setStep((s) => (Math.max(s - 1, 1) as 1 | 2 | 3));
 
   const handleSubmit = async (asDraft: boolean) => {
     if (asDraft) {
       if (!title.trim()) {
         setShowErrors(true);
         setStep(1);
-        alert('A job title is required to save a draft.');
         return;
       }
     } else {
@@ -83,18 +103,23 @@ export default function CreateJobPage() {
     }
     setSaving(true);
     try {
-      await dispatch(createJob({
-        title: title.trim(),
-        department,
-        employmentType,
-        description: description.trim() || (asDraft ? '(draft — description pending)' : description),
-        location,
-        salaryRange,
-        experienceLevel,
-        requiredSkills: skills,
-        status: asDraft ? 'draft' : 'active',
-        aiWeights: weights,
-      })).unwrap();
+      await dispatch(
+        createJob({
+          title: title.trim(),
+          department,
+          employmentType,
+          description: description.trim() || (asDraft ? '(draft — description pending)' : ''),
+          location,
+          salaryRange,
+          experienceLevel,
+          requiredSkills: skills,
+          status: asDraft ? 'draft' : 'active',
+          aiWeights: weights,
+          passingScore,
+          shortlistCap,
+          applicationDeadline,
+        }) as any
+      ).unwrap();
       router.push('/jobs');
     } catch (err: any) {
       alert('Failed to create job: ' + (err?.message || 'Unknown error'));
@@ -103,270 +128,467 @@ export default function CreateJobPage() {
     }
   };
 
-  const lensProgress = Math.round(((title ? 1 : 0) + (description ? 1 : 0) + (skills.length > 0 ? 1 : 0)) / 3 * 100);
+  const steps = [
+    { n: 1 as const, label: 'Details' },
+    { n: 2 as const, label: 'AI Weights' },
+    { n: 3 as const, label: 'Skills & Config' },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto px-4">
-      {/* Breadcrumbs & Header */}
-      <div className="mb-10">
-        <div className="flex items-center gap-2 text-on-surface-variant text-sm mb-4">
-          <span>Jobs</span>
-          <span className="material-symbols-outlined text-xs">chevron_right</span>
-          <span className="text-secondary font-semibold">New Job Opening</span>
+    <div className="max-w-4xl mx-auto space-y-4">
+      {/* HEADER */}
+      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div>
+          <nav className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+            <Link href="/jobs" className="hover:text-slate-900 transition-colors">Jobs</Link>
+            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            <span className="text-indigo-700">New role</span>
+          </nav>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-tight">Define the role</h1>
+          <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+            Configure the job spec and how the AI should weight candidates.
+          </p>
         </div>
-        <h2 className="text-4xl font-extrabold tracking-tight text-primary">Define the Perfect Role</h2>
-        <p className="text-on-surface-variant mt-2 text-lg">Configure your talent intelligence parameters to find the highest-match candidates.</p>
-      </div>
+        <button
+          onClick={() => handleSubmit(true)}
+          disabled={saving || !title.trim()}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed press"
+        >
+          <span className="material-symbols-outlined text-[14px]">save</span>
+          {saving ? 'Saving…' : 'Save draft'}
+        </button>
+      </section>
 
-      {/* Multi-step Layout */}
-      <div className="grid grid-cols-12 gap-8">
-        {/* Step Navigation Sidebar */}
-        <div className="col-span-3">
-          <div className="sticky top-28 space-y-6">
-            <div className="space-y-4">
-              {[
-                { num: 1, label: 'Job Details' },
-                { num: 2, label: 'AI Weighting' },
-                { num: 3, label: 'Skills & Tags' },
-              ].map((s) => (
-                <div key={s.num}>
-                  <button
-                    onClick={() => {
-                      if (s.num > 1 && !step1Valid) {
-                        setShowErrors(true);
-                        setStep(1);
-                        return;
-                      }
-                      setStep(s.num);
-                    }}
-                    className={`flex items-center gap-4 group w-full text-left ${s.num > step ? 'opacity-50' : ''}`}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      s.num === step ? 'bg-primary text-white ring-4 ring-primary-fixed' :
-                      s.num < step ? 'bg-secondary text-white' :
-                      'bg-surface-container-highest text-on-surface-variant'
-                    }`}>
-                      {s.num < step ? <span className="material-symbols-outlined text-sm">check</span> : s.num}
-                    </div>
-                    <span className={`font-bold ${s.num === step ? 'text-primary' : 'text-on-surface-variant'}`}>
-                      {s.label}
-                    </span>
-                  </button>
-                  {s.num < 3 && <div className="w-0.5 h-8 bg-surface-container-highest ml-5" />}
-                </div>
-              ))}
-            </div>
-
-            {/* Lens Precision Card */}
-            <div className="bg-tertiary-container p-6 rounded-xl text-white mt-12 relative overflow-hidden">
-              <div className="relative z-10">
-                <h4 className="font-bold mb-2">Lens Precision</h4>
-                <p className="text-xs text-on-tertiary-container mb-4">
-                  {lensProgress < 50 ? 'Currently optimized for broad discovery.' : lensProgress < 100 ? 'Getting more precise...' : 'Fully calibrated!'}
-                </p>
-                <div className="h-1.5 w-full bg-on-tertiary-container/20 rounded-full">
-                  <div className="h-full bg-on-tertiary-container rounded-full transition-all duration-500" style={{ width: `${lensProgress}%` }} />
-                </div>
-              </div>
-              <div className="absolute -right-4 -bottom-4 opacity-10">
-                <span className="material-symbols-outlined text-8xl">psychology</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Form Canvas */}
-        <div className="col-span-9 space-y-10">
-          {/* Section 1: Core Job Identity */}
-          {step >= 1 && (
-            <section className="bg-surface-container-lowest p-10 rounded-xl shadow-sm border border-outline-variant/10">
-              <div className="flex items-center gap-3 mb-8">
-                <span className="material-symbols-outlined text-secondary">description</span>
-                <h3 className="text-xl font-bold">Section 1: Core Job Identity</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-8">
-                <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Internal Job Title <span className="text-error">*</span></label>
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className={`w-full bg-surface border-none rounded-lg py-4 px-5 text-lg font-bold focus:ring-2 focus:ring-secondary/30 placeholder:text-surface-variant ${showErrors && step1Errors.title ? 'ring-2 ring-error' : ''}`}
-                    placeholder="e.g. Senior AI Research Engineer"
-                  />
-                  {showErrors && step1Errors.title && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.title}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Department</label>
-                  <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30">
-                    <option>Engineering &amp; Data Science</option>
-                    <option>Product Development</option>
-                    <option>Executive Leadership</option>
-                    <option>Operations</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Employment Type</label>
-                  <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30">
-                    <option>Full-time Permanent</option>
-                    <option>Contract (Long term)</option>
-                    <option>Interim Leadership</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Location <span className="text-error">*</span></label>
-                  <input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className={`w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30 ${showErrors && step1Errors.location ? 'ring-2 ring-error' : ''}`}
-                    placeholder="e.g. San Francisco, Remote"
-                  />
-                  {showErrors && step1Errors.location && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.location}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Salary Range <span className="text-error">*</span></label>
-                  <input
-                    value={salaryRange}
-                    onChange={(e) => setSalaryRange(e.target.value)}
-                    className={`w-full bg-surface border-none rounded-lg py-3 px-5 focus:ring-2 focus:ring-secondary/30 ${showErrors && step1Errors.salaryRange ? 'ring-2 ring-error' : ''}`}
-                    placeholder="e.g. $180k - $240k"
-                  />
-                  {showErrors && step1Errors.salaryRange && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.salaryRange}</p>}
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Comprehensive Job Narrative <span className="text-error">*</span></label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className={`w-full bg-surface border-none rounded-lg py-4 px-5 focus:ring-2 focus:ring-secondary/30 ${showErrors && step1Errors.description ? 'ring-2 ring-error' : ''}`}
-                    placeholder="Describe the mission, the impact, and the day-to-day excellence required..."
-                    rows={6}
-                  />
-                  {showErrors && step1Errors.description && <p className="text-error text-xs mt-1 font-semibold">{step1Errors.description}</p>}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Section 2: AI Lens Calibration */}
-          {step >= 2 && (
-            <section className="bg-surface-container-low p-10 rounded-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/5 rounded-full -mr-20 -mt-20 blur-3xl" />
-              <div className="flex justify-between items-center mb-8 relative z-10">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>tune</span>
-                  <h3 className="text-xl font-bold">Section 2: AI Lens Calibration</h3>
-                </div>
-                <span className="px-3 py-1 bg-secondary/10 text-secondary text-xs font-bold rounded-full uppercase tracking-widest">Critical Tuning</span>
-              </div>
-              <p className="text-on-surface-variant mb-10 max-w-xl">Adjust how Umurava AI prioritizes candidate data points. This directly influences your match scores.</p>
-              <div className="grid grid-cols-2 gap-12">
-                {[
-                  { key: 'technicalSkills' as const, label: 'Technical Skills', desc: 'Prioritizes verified code & platform proficiency.' },
-                  { key: 'yearsOfExperience' as const, label: 'Years of Experience', desc: 'Emphasis on tenure and historical progression.' },
-                  { key: 'educationCredentials' as const, label: 'Education Credentials', desc: 'Weighting for specific degrees and institutions.' },
-                  { key: 'pastProjectImpact' as const, label: 'Past Project Impact', desc: 'Focus on portfolio quality and proven outcomes.' },
-                ].map((w) => (
-                  <div key={w.key} className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="font-bold">{w.label}</span>
-                      <span className="text-secondary font-bold">{weights[w.key]}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={weights[w.key]}
-                      onChange={(e) => setWeights({ ...weights, [w.key]: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-on-surface-variant italic">{w.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Section 3: Mandatory Stack */}
-          {step >= 3 && (
-            <section className="bg-surface-container-lowest p-10 rounded-xl shadow-sm border border-outline-variant/10">
-              <div className="flex items-center gap-3 mb-8">
-                <span className="material-symbols-outlined text-secondary">terminal</span>
-                <h3 className="text-xl font-bold">Section 3: Mandatory Stack</h3>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-on-surface-variant mb-4">Required Technical Proficiencies <span className="text-error">*</span></label>
-                <div className={`flex flex-wrap gap-2 p-4 bg-surface rounded-xl border-2 border-dashed mb-4 ${showErrors && step3Errors.skills ? 'border-error' : 'border-outline-variant/20'}`}>
-                  {skills.map((skill) => (
-                    <span key={skill} className="flex items-center gap-2 bg-secondary text-white px-3 py-1.5 rounded-lg text-sm font-semibold">
-                      {skill}
-                      <button onClick={() => removeSkill(skill)} className="hover:text-primary-fixed transition-colors">
-                        <span className="material-symbols-outlined text-sm">close</span>
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    value={skillInput}
-                    onChange={(e) => setSkillInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(skillInput); } }}
-                    className="flex-1 min-w-[200px] bg-transparent border-none focus:ring-0 text-sm"
-                    placeholder="Type and press Enter..."
-                  />
-                </div>
-                {showErrors && step3Errors.skills && <p className="text-error text-xs mb-2 font-semibold">{step3Errors.skills}</p>}
-                <div className="flex gap-4">
-                  <p className="text-xs text-on-surface-variant">Recommended:</p>
-                  <div className="flex gap-2">
-                    {['TensorFlow', 'AWS Sagemaker', 'LangChain'].filter((s) => !skills.includes(s)).map((s) => (
-                      <button key={s} onClick={() => addSkill(s)} className="text-xs bg-surface-container px-2 py-1 rounded hover:bg-surface-container-high transition-colors font-semibold">
-                        + {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-8 border-t border-surface-container">
-            <button
-              onClick={() => handleSubmit(true)}
-              disabled={saving || !title.trim()}
-              title={!title.trim() ? 'Enter a job title to save a draft' : 'Save current progress as a draft'}
-              className="flex items-center gap-2 text-on-surface-variant font-semibold hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined">save</span>
-              {saving ? 'Saving...' : 'Save Draft'}
-            </button>
-            <div className="flex gap-4">
-              {step < 3 ? (
+      {/* STEP NAV */}
+      <section className="glass-panel rounded-xl p-2.5">
+        <div className="flex items-center gap-1">
+          {steps.map((s, idx) => {
+            const isActive = step === s.n;
+            const isDone = step > s.n;
+            return (
+              <div key={s.n} className="flex-1 flex items-center gap-1">
                 <button
-                  onClick={handleNext}
-                  disabled={step === 1 && !step1Valid}
-                  className="px-10 py-3 bg-ai-gradient text-white rounded-lg font-bold shadow-lg shadow-secondary/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    if (s.n > 1 && !step1Valid) {
+                      setShowErrors(true);
+                      setStep(1);
+                      return;
+                    }
+                    setStep(s.n);
+                  }}
+                  className={`flex-1 relative flex items-center gap-2 h-8 px-3 rounded-lg text-[11px] font-bold transition-colors ${
+                    isActive
+                      ? 'bg-slate-900 text-white'
+                      : isDone
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-white/60 text-slate-500 hover:text-slate-900'
+                  }`}
                 >
-                  Next Step
-                  <span className="material-symbols-outlined">arrow_forward</span>
-                </button>
-              ) : (
-                <>
-                  <button onClick={() => router.push('/jobs')} className="px-8 py-3 rounded-lg border border-outline font-semibold hover:bg-surface-container transition-colors">
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleSubmit(false)}
-                    disabled={saving || !step1Valid || !step3Valid}
-                    className="px-10 py-3 bg-ai-gradient text-white rounded-lg font-bold shadow-lg shadow-secondary/30 flex items-center gap-2 disabled:opacity-50"
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      isActive ? 'bg-white text-slate-900' : isDone ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}
                   >
-                    {saving ? 'Saving...' : 'Review & Post Job'}
-                    <span className="material-symbols-outlined">arrow_forward</span>
-                  </button>
-                </>
-              )}
+                    {isDone ? '✓' : s.n}
+                  </div>
+                  <span className="uppercase tracking-widest text-[10px]">{s.label}</span>
+                </button>
+                {idx < steps.length - 1 && (
+                  <span className="material-symbols-outlined text-slate-300 text-[14px]">chevron_right</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* STEP CONTENT */}
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {step === 1 && (
+          <Step1
+            title={title}
+            setTitle={setTitle}
+            department={department}
+            setDepartment={setDepartment}
+            employmentType={employmentType}
+            setEmploymentType={setEmploymentType}
+            location={location}
+            setLocation={setLocation}
+            salaryRange={salaryRange}
+            setSalaryRange={setSalaryRange}
+            experienceLevel={experienceLevel}
+            setExperienceLevel={setExperienceLevel}
+            description={description}
+            setDescription={setDescription}
+            applicationDeadline={applicationDeadline}
+            setApplicationDeadline={setApplicationDeadline}
+            showErrors={showErrors}
+            step1Err={step1Err}
+          />
+        )}
+
+        {step === 2 && (
+          <Step2 weights={weights} setWeights={setWeights} passingScore={passingScore} setPassingScore={setPassingScore} />
+        )}
+
+        {step === 3 && (
+          <Step3
+            skills={skills}
+            removeSkill={removeSkill}
+            addSkill={addSkill}
+            skillInput={skillInput}
+            setSkillInput={setSkillInput}
+            shortlistCap={shortlistCap}
+            setShortlistCap={setShortlistCap}
+            showErrors={showErrors}
+            step3Err={step3Err}
+          />
+        )}
+      </motion.div>
+
+      {/* FOOTER */}
+      <section className="glass-panel rounded-xl p-2.5 flex items-center justify-between">
+        <button
+          onClick={handleBack}
+          disabled={step === 1}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/70 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+          Back
+        </button>
+
+        <div className="flex gap-2">
+          {step < 3 ? (
+            <button
+              onClick={handleNext}
+              className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 transition press"
+            >
+              Next
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => router.push('/jobs')}
+                className="inline-flex items-center h-8 px-3 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 press"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSubmit(false)}
+                disabled={saving || !step1Valid || !step3Valid}
+                className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition press"
+              >
+                {saving ? 'Publishing…' : 'Publish role'}
+                <span className="material-symbols-outlined text-[14px]">check</span>
+              </button>
+            </>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ---------- Sub-components ----------
+
+const inputCls =
+  'w-full bg-white border border-slate-200 rounded-lg px-3 h-9 text-[12.5px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all placeholder:text-slate-400';
+
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 flex items-center gap-1">
+        {label}
+        {required && <span className="text-rose-500">*</span>}
+      </label>
+      <div className="mt-1">{children}</div>
+      {error && <p className="text-[10px] text-rose-600 font-semibold mt-1">{error}</p>}
+    </div>
+  );
+}
+
+function Step1(props: {
+  title: string;
+  setTitle: (v: string) => void;
+  department: string;
+  setDepartment: (v: string) => void;
+  employmentType: string;
+  setEmploymentType: (v: string) => void;
+  location: string;
+  setLocation: (v: string) => void;
+  salaryRange: string;
+  setSalaryRange: (v: string) => void;
+  experienceLevel: string;
+  setExperienceLevel: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  applicationDeadline: string;
+  setApplicationDeadline: (v: string) => void;
+  showErrors: boolean;
+  step1Err: Record<string, string>;
+}) {
+  const p = props;
+  return (
+    <section className="glass-panel rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="material-symbols-outlined text-indigo-600 text-[16px]">description</span>
+        <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Job details</h2>
+      </div>
+
+      <Field label="Job title" required error={p.showErrors ? p.step1Err.title : ''}>
+        <input
+          value={p.title}
+          onChange={(e) => p.setTitle(e.target.value)}
+          className={inputCls}
+          placeholder="e.g. Senior AI Research Engineer"
+        />
+      </Field>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Field label="Department">
+          <select value={p.department} onChange={(e) => p.setDepartment(e.target.value)} className={inputCls}>
+            {DEPARTMENTS.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Employment type">
+          <select value={p.employmentType} onChange={(e) => p.setEmploymentType(e.target.value)} className={inputCls}>
+            {EMPLOYMENT_TYPES.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Field label="Location" required error={p.showErrors ? p.step1Err.location : ''}>
+          <input
+            value={p.location}
+            onChange={(e) => p.setLocation(e.target.value)}
+            className={inputCls}
+            placeholder="e.g. Kigali, Rwanda"
+          />
+        </Field>
+        <Field label="Salary range" required error={p.showErrors ? p.step1Err.salaryRange : ''}>
+          <input
+            value={p.salaryRange}
+            onChange={(e) => p.setSalaryRange(e.target.value)}
+            className={inputCls}
+            placeholder="e.g. $60k – $90k"
+          />
+        </Field>
+        <Field label="Experience level">
+          <select value={p.experienceLevel} onChange={(e) => p.setExperienceLevel(e.target.value)} className={inputCls}>
+            {EXPERIENCE_LEVELS.map((e) => (
+              <option key={e}>{e}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <Field label="Application deadline">
+        <input
+          type="date"
+          value={p.applicationDeadline}
+          onChange={(e) => p.setApplicationDeadline(e.target.value)}
+          className={inputCls}
+        />
+      </Field>
+
+      <Field label="Description" required error={p.showErrors ? p.step1Err.description : ''}>
+        <textarea
+          value={p.description}
+          onChange={(e) => p.setDescription(e.target.value)}
+          rows={6}
+          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-[12.5px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all placeholder:text-slate-400 leading-relaxed"
+          placeholder="Mission, responsibilities, impact, and what success looks like…"
+        />
+      </Field>
+    </section>
+  );
+}
+
+function Step2(props: {
+  weights: Record<string, number>;
+  setWeights: (w: any) => void;
+  passingScore: number;
+  setPassingScore: (n: number) => void;
+}) {
+  const { weights, setWeights, passingScore, setPassingScore } = props;
+  return (
+    <section className="glass-panel rounded-xl p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <span
+          className="material-symbols-outlined text-indigo-600 text-[16px]"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          tune
+        </span>
+        <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">AI weighting</h2>
+      </div>
+      <p className="text-[11px] text-slate-500 font-medium -mt-2">
+        Tell the AI how much each dimension matters when ranking candidates.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {WEIGHT_KEYS.map((w) => (
+          <div key={w.key} className="bg-white/70 border border-slate-100 rounded-lg p-3">
+            <div className="flex items-baseline justify-between mb-1">
+              <p className="text-[12px] font-bold text-slate-900">{w.label}</p>
+              <p className="text-[14px] font-extrabold text-indigo-600 tabular-nums">{weights[w.key]}%</p>
             </div>
+            <p className="text-[10.5px] text-slate-500 font-medium mb-2.5">{w.hint}</p>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={weights[w.key]}
+              onChange={(e) => setWeights({ ...weights, [w.key]: parseInt(e.target.value) })}
+              className="w-full"
+            />
           </div>
+        ))}
+      </div>
+
+      <div className="bg-white/70 border border-slate-100 rounded-lg p-3">
+        <div className="flex items-baseline justify-between mb-1">
+          <div>
+            <p className="text-[12px] font-bold text-slate-900">Passing score</p>
+            <p className="text-[10.5px] text-slate-500 font-medium">Minimum match score to enter the shortlist</p>
+          </div>
+          <p className="text-[14px] font-extrabold text-indigo-600 tabular-nums">{passingScore}%</p>
+        </div>
+        <input
+          type="range"
+          min={50}
+          max={95}
+          step={1}
+          value={passingScore}
+          onChange={(e) => setPassingScore(parseInt(e.target.value))}
+          className="w-full mt-2"
+        />
+      </div>
+    </section>
+  );
+}
+
+function Step3(props: {
+  skills: string[];
+  addSkill: (s: string) => void;
+  removeSkill: (s: string) => void;
+  skillInput: string;
+  setSkillInput: (s: string) => void;
+  shortlistCap: 10 | 20;
+  setShortlistCap: (n: 10 | 20) => void;
+  showErrors: boolean;
+  step3Err: Record<string, string>;
+}) {
+  const p = props;
+  const suggestions = ['React', 'TypeScript', 'Node.js', 'Python', 'Postgres', 'Figma', 'GraphQL', 'AWS'];
+  return (
+    <section className="glass-panel rounded-xl p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="material-symbols-outlined text-indigo-600 text-[16px]">terminal</span>
+        <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Skills & shortlist config</h2>
+      </div>
+
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+          Required skills <span className="text-rose-500">*</span>
+        </label>
+        <div
+          className={`mt-1 flex flex-wrap gap-1.5 p-2 bg-white border rounded-lg ${
+            p.showErrors && p.step3Err.skills ? 'border-rose-400' : 'border-slate-200'
+          }`}
+        >
+          {p.skills.map((skill) => (
+            <span
+              key={skill}
+              className="inline-flex items-center gap-1 h-6 pl-2.5 pr-1 rounded-full bg-indigo-600 text-white text-[10.5px] font-semibold"
+            >
+              {skill}
+              <button
+                onClick={() => p.removeSkill(skill)}
+                className="w-4 h-4 rounded-full hover:bg-white/20 flex items-center justify-center"
+                aria-label={`Remove ${skill}`}
+              >
+                <span className="material-symbols-outlined text-[12px]">close</span>
+              </button>
+            </span>
+          ))}
+          <input
+            value={p.skillInput}
+            onChange={(e) => p.setSkillInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                p.addSkill(p.skillInput);
+              }
+              if (e.key === 'Backspace' && !p.skillInput && p.skills.length > 0) {
+                p.removeSkill(p.skills[p.skills.length - 1]);
+              }
+            }}
+            placeholder={p.skills.length === 0 ? 'Type a skill and press Enter…' : 'Add more…'}
+            className="flex-1 min-w-[160px] bg-transparent text-[12.5px] font-medium placeholder:text-slate-400 focus:outline-none px-2"
+          />
+        </div>
+        {p.showErrors && p.step3Err.skills && (
+          <p className="text-[10px] text-rose-600 font-semibold mt-1">{p.step3Err.skills}</p>
+        )}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <span className="text-[10px] font-semibold text-slate-400 mr-1">Suggested:</span>
+          {suggestions
+            .filter((s) => !p.skills.find((x) => x.toLowerCase() === s.toLowerCase()))
+            .map((s) => (
+              <button
+                key={s}
+                onClick={() => p.addSkill(s)}
+                className="text-[10.5px] font-semibold bg-white border border-slate-200 text-slate-700 hover:border-indigo-300 hover:text-indigo-700 h-6 px-2 rounded-full transition-colors"
+              >
+                + {s}
+              </button>
+            ))}
         </div>
       </div>
-    </div>
+
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Shortlist cap</label>
+        <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 mb-2">
+          How many top candidates to include in the shortlist
+        </p>
+        <div className="inline-flex gap-1 p-1 bg-white border border-slate-200 rounded-lg">
+          {[10, 20].map((n) => (
+            <button
+              key={n}
+              onClick={() => p.setShortlistCap(n as 10 | 20)}
+              className={`h-8 px-4 rounded-md text-[12px] font-bold transition-colors ${
+                p.shortlistCap === n
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Top {n}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

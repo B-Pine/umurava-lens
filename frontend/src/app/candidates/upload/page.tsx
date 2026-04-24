@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { fetchJobs } from '../../../store/jobsSlice';
 import { uploadCandidateFiles, uploadCandidatesCsv } from '../../../store/candidatesSlice';
@@ -11,6 +13,7 @@ interface QueueItem {
   status: 'parsing' | 'analyzing' | 'waiting' | 'done' | 'failed';
   progress: number;
   reason?: string;
+  startedAt?: number;
 }
 
 type Mode = 'pdf' | 'csv';
@@ -29,6 +32,15 @@ export default function CandidateUploadPage() {
     fetchPickedFiles,
   } = useGoogleDrivePicker();
   const [driveNotice, setDriveNotice] = useState<string | null>(null);
+
+  // Force re-render for smooth asymptotic progress curve
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const isProcessing = queue.some((q) => q.status === 'parsing' || q.status === 'analyzing');
+    if (!isProcessing) return;
+    const interval = setInterval(() => setTick((n) => n + 1), 500);
+    return () => clearInterval(interval);
+  }, [queue]);
 
   useEffect(() => {
     dispatch(fetchJobs({ limit: 50 }));
@@ -51,7 +63,8 @@ export default function CandidateUploadPage() {
       const newItems: QueueItem[] = files.map((f) => ({
         name: f.name,
         status: 'parsing',
-        progress: mode === 'pdf' ? 30 : 60,
+        progress: 0,
+        startedAt: Date.now(),
       }));
       setQueue(newItems);
 
@@ -106,79 +119,93 @@ export default function CandidateUploadPage() {
         setDriveNotice(
           err.code === 'not_configured'
             ? 'Google Drive integration is not set up. See frontend/.env.example for the keys you need.'
-            : `${err.message}${err.details ? ` — ${err.details}` : ''}`
+            : `${err.message}${err.details ? ` - ${err.details}` : ''}`
         );
       }
     );
   }, [openPicker, fetchPickedFiles, handleFiles]);
 
   const accept = mode === 'pdf' ? '.pdf' : '.csv';
+  const isProcessing = queue.some((q) => q.status !== 'done' && q.status !== 'failed');
+  const doneCount = queue.filter((q) => q.status === 'done').length;
+  const failedCount = queue.filter((q) => q.status === 'failed').length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 px-4">
-      <section className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div className="space-y-2">
-          <span className="text-secondary font-semibold text-sm tracking-widest uppercase">
-            Talent Acquisition
-          </span>
-          <h2 className="text-4xl font-extrabold text-on-primary-fixed tracking-tight">
-            Bulk Candidate Upload
-          </h2>
-          <p className="text-on-surface-variant">
-            Ingest resumes at scale. Our AI Lens extracts skills, experience, and intent into the
-            Umurava Talent Profile Schema instantly.
+    <div className="max-w-5xl mx-auto space-y-4">
+      {/* HEADER */}
+      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div>
+          <nav className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+            <Link href="/candidates" className="hover:text-slate-900 transition-colors">Candidates</Link>
+            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            <span className="text-indigo-700">Upload</span>
+          </nav>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-tight">
+            Upload Candidates
+          </h1>
+          <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+            Import resumes or spreadsheets. AI extracts profiles into the talent schema instantly.
           </p>
         </div>
-        <div className="w-full md:w-72 space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-tighter">
-            Target Job Opening
+
+        {/* Target Job Selector */}
+        <div className="w-full md:w-64">
+          <label className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            Target Job
           </label>
-          <div className="relative">
-            <select
-              value={selectedJobId}
-              onChange={(e) => setSelectedJobId(e.target.value)}
-              className="w-full appearance-none bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm font-semibold focus:ring-2 focus:ring-secondary/20 cursor-pointer"
-            >
-              <option value="">Choose a job…</option>
-              {jobs.map((job) => (
-                <option key={job._id} value={job._id}>
-                  {job.title}
-                </option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
-              expand_more
-            </span>
-          </div>
+          <select
+            value={selectedJobId}
+            onChange={(e) => setSelectedJobId(e.target.value)}
+            className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg px-2.5 h-8 text-[12px] font-medium text-slate-900 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+          >
+            <option value="">Choose a job...</option>
+            {jobs.map((job) => (
+              <option key={job._id} value={job._id}>
+                {job.title}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 
-      {/* Mode tabs */}
-      <div className="inline-flex rounded-xl bg-surface-container-low p-1 border border-outline-variant/20">
+      {/* MODE TABS */}
+      <section className="glass-panel rounded-xl p-1.5 inline-flex gap-1">
         {(['pdf', 'csv'] as Mode[]).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+            className={`relative flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-bold transition-colors ${
               mode === m
-                ? 'bg-white shadow-sm text-secondary'
-                : 'text-on-surface-variant hover:text-on-surface'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
-            {m === 'pdf' ? 'PDF Resumes' : 'CSV / Spreadsheet'}
+            <span className="material-symbols-outlined text-[14px]">
+              {m === 'pdf' ? 'picture_as_pdf' : 'table_view'}
+            </span>
+            <span className="uppercase tracking-widest text-[10px]">
+              {m === 'pdf' ? 'PDF Resumes' : 'CSV / Spreadsheet'}
+            </span>
           </button>
         ))}
-      </div>
+      </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-secondary/20 to-tertiary-container/20 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
+      {/* MAIN CONTENT */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left Column - Drop Zone + Queue */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Drop Zone */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="glass-panel rounded-xl overflow-hidden"
+          >
             <div
-              className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-16 transition-all ${
+              className={`relative flex flex-col items-center justify-center p-10 transition-all ${
                 dragActive
-                  ? 'border-secondary bg-secondary/5'
-                  : 'border-outline-variant bg-surface-container-lowest hover:border-secondary group-hover:bg-white'
+                  ? 'bg-indigo-50/80 border-2 border-dashed border-indigo-400'
+                  : 'border-2 border-dashed border-transparent'
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -191,22 +218,34 @@ export default function CandidateUploadPage() {
                 handleFileInput(e.dataTransfer.files);
               }}
             >
-              <div className="w-20 h-20 bg-secondary/10 rounded-full flex items-center justify-center mb-6">
-                <span className="material-symbols-outlined text-4xl text-secondary">
+              {/* Icon */}
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
+                dragActive ? 'bg-indigo-100' : 'bg-slate-100'
+              }`}>
+                <span className={`material-symbols-outlined text-[28px] transition-colors ${
+                  dragActive ? 'text-indigo-600' : 'text-slate-400'
+                }`}>
                   {mode === 'pdf' ? 'cloud_upload' : 'table_view'}
                 </span>
               </div>
-              <h3 className="text-xl font-bold text-on-surface mb-2 text-center">
-                {mode === 'pdf' ? 'Drop PDF resumes here' : 'Drop CSV files here'}
+
+              <h3 className="text-[14px] font-extrabold text-slate-900 mb-1 text-center">
+                {dragActive
+                  ? 'Release to upload'
+                  : mode === 'pdf'
+                    ? 'Drop PDF resumes here'
+                    : 'Drop CSV files here'}
               </h3>
-              <p className="text-on-surface-variant text-center max-w-sm mb-8">
+              <p className="text-[11px] text-slate-500 font-medium text-center max-w-sm mb-5 leading-relaxed">
                 {mode === 'pdf'
-                  ? 'AI will extract firstName, lastName, skills, experience, education, projects, and more into the Umurava Talent Profile Schema.'
-                  : 'Columns recognized: Full Name, Email, Phone, Headline, Location, Skills (comma-separated), LinkedIn, GitHub.'}
+                  ? 'Gemini AI extracts skills, experience, education, projects and more into a structured talent profile.'
+                  : 'Columns: Full Name, Email, Phone, Headline, Location, Skills (semicolon-separated), LinkedIn, GitHub.'}
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <label className="bg-primary text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:scale-[1.02] transition-transform active:scale-95 shadow-xl shadow-primary/10 cursor-pointer">
-                  <span className="material-symbols-outlined">attach_file</span>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <label className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 transition cursor-pointer press">
+                  <span className="material-symbols-outlined text-[14px]">attach_file</span>
                   Browse Files
                   <input
                     type="file"
@@ -220,130 +259,307 @@ export default function CandidateUploadPage() {
                   type="button"
                   onClick={handleDrivePick}
                   disabled={driveConfigured && !driveReady}
-                  className="px-6 py-3 rounded-xl border border-outline-variant bg-white text-on-surface font-bold flex items-center gap-2 hover:border-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors press"
                 >
-                  <span className="material-symbols-outlined text-base">folder_open</span>
-                  {driveConfigured && !driveReady ? 'Loading Drive…' : 'From Google Drive'}
+                  <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                  {driveConfigured && !driveReady ? 'Loading...' : 'Google Drive'}
                 </button>
               </div>
+
+              {/* Drive Notice */}
               {driveNotice && (
-                <div className="mt-6 max-w-md text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-center">
-                  {driveNotice}
+                <div className="mt-4 flex items-start gap-2 max-w-md p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                  <span className="material-symbols-outlined text-amber-600 text-[14px] mt-0.5 shrink-0">warning</span>
+                  <p className="text-[10px] font-semibold text-amber-700 leading-relaxed">{driveNotice}</p>
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-surface-container-low rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center">
-              <h4 className="font-bold text-sm uppercase tracking-wider text-on-surface-variant">
-                Processing Queue ({queue.length})
-              </h4>
-              {queue.some((q) => q.status !== 'done' && q.status !== 'failed') && (
-                <span className="text-xs font-medium text-secondary bg-secondary/10 px-2 py-1 rounded-full">
+          {/* Processing Queue */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="glass-panel rounded-xl overflow-hidden"
+          >
+            {/* Queue Header */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-600 text-[16px]">queue</span>
+                <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">
+                  Processing Queue
+                </h2>
+                <span className="text-[10px] font-bold text-slate-400 tabular-nums">
+                  {queue.length}
+                </span>
+              </div>
+              {isProcessing && (
+                <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">
+                  <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
                   AI Active
                 </span>
               )}
+              {queue.length > 0 && !isProcessing && (
+                <span className="text-[10px] font-bold text-slate-500">
+                  {doneCount} done{failedCount > 0 ? ` · ${failedCount} failed` : ''}
+                </span>
+              )}
             </div>
-            <div className="divide-y divide-outline-variant/20">
+
+            {/* Queue Items */}
+            <div className="divide-y divide-slate-100/80">
               {queue.length === 0 ? (
-                <div className="p-6 text-center text-on-surface-variant text-sm">
-                  No files in queue. Upload files to begin.
+                <div className="p-6 text-center">
+                  <span className="material-symbols-outlined text-2xl text-slate-300 mb-2 block">inbox</span>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    No files in queue. Upload files to begin.
+                  </p>
                 </div>
               ) : (
-                queue.map((item) => (
-                  <div key={item.name} className="p-6 flex items-center gap-4">
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        item.status === 'failed' ? 'bg-rose-100 text-rose-600' : 'bg-surface-container-high text-on-surface-variant'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined">
-                        {item.status === 'failed' ? 'error' : 'description'}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-semibold text-sm truncate">{item.name}</p>
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-widest ml-4 shrink-0 ${
-                            item.status === 'done'
-                              ? 'text-secondary'
-                              : item.status === 'failed'
-                                ? 'text-error'
-                                : 'text-on-surface-variant'
+                <AnimatePresence initial={false}>
+                  {queue.map((item, idx) => {
+                    let percent = item.progress;
+                    if (item.status === 'parsing' && item.startedAt) {
+                      const elapsedSec = (Date.now() - item.startedAt) / 1000;
+                      // Simulation curve: 1 - exp(-t/k) reaches 90% at t = 2.3k. 
+                      // For PDF (heavy Gemini extraction), use 6 to reach 90% around 14s.
+                      // For CSV use 2 to reach 90% in ~4.5s.
+                      percent = Math.min(94, Math.round((1 - Math.exp(-elapsedSec / (mode === 'pdf' ? 6 : 2))) * 100));
+                    } else if (item.status === 'done' || item.status === 'failed') {
+                      percent = 100;
+                    }
+
+                    return (
+                      <motion.div
+                        key={item.name}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.03, duration: 0.25 }}
+                        className="flex items-center gap-3 px-3 py-2.5"
+                      >
+                        {/* File Icon */}
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            item.status === 'failed'
+                              ? 'bg-rose-50'
+                              : item.status === 'done'
+                                ? 'bg-emerald-50'
+                                : 'bg-slate-100'
                           }`}
                         >
-                          {item.status === 'parsing'
-                            ? 'Parsing & Extracting…'
-                            : item.status === 'done'
-                              ? 'Complete'
-                              : item.status === 'failed'
-                                ? 'Failed'
-                                : 'Waiting'}
-                        </span>
+                          <span
+                            className={`material-symbols-outlined text-[16px] ${
+                              item.status === 'failed'
+                                ? 'text-rose-500'
+                                : item.status === 'done'
+                                  ? 'text-emerald-600'
+                                  : 'text-slate-400'
+                            }`}
+                            style={item.status === 'done' ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                          >
+                            {item.status === 'failed' ? 'error' : item.status === 'done' ? 'check_circle' : 'description'}
+                          </span>
+                        </div>
+
+                        {/* File Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="text-[12px] font-bold text-slate-900 truncate">{item.name}</p>
+                            <span
+                              className={`text-[9px] font-bold uppercase tracking-[0.18em] shrink-0 ${
+                                item.status === 'done'
+                                  ? 'text-emerald-600'
+                                  : item.status === 'failed'
+                                    ? 'text-rose-600'
+                                    : 'text-indigo-600'
+                              }`}
+                            >
+                              {item.status === 'parsing'
+                                ? 'Extracting...'
+                                : item.status === 'done'
+                                  ? 'Complete'
+                                  : item.status === 'failed'
+                                    ? 'Failed'
+                                    : 'Waiting'}
+                            </span>
+                          </div>
+                          {item.status === 'failed' && item.reason && (
+                            <p className="text-[10px] text-rose-600 font-medium mb-1 truncate">{item.reason}</p>
+                          )}
+                          {/* Progress Bar */}
+                          <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <motion.div
+                              className={`h-full rounded-full ${
+                                item.status === 'failed'
+                                  ? 'bg-rose-400'
+                                  : item.status === 'done'
+                                    ? 'bg-emerald-500'
+                                    : 'bg-gradient-to-r from-indigo-500 to-fuchsia-400'
+                              }`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percent}%` }}
+                              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Right Column - Info Cards */}
+        <div className="space-y-4">
+          {/* AI Extraction Info */}
+          <motion.section
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="glass-panel rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <span
+                  className="material-symbols-outlined text-[14px] text-indigo-600"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
+                  psychology
+                </span>
+              </div>
+              <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">AI Extraction</h2>
+            </div>
+            <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3">
+              Every resume is parsed by Gemini into the Umurava Talent Profile Schema - skills with level and years, experience timeline, education, and projects.
+            </p>
+            <div className="space-y-1.5">
+              {[
+                { label: 'Semantic Skill Mapping', icon: 'auto_awesome' },
+                { label: 'Experience Normalization', icon: 'timeline' },
+                { label: 'Availability Inference', icon: 'event_available' },
+                { label: 'Education Credentials', icon: 'school' },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-2 bg-white/50 border border-slate-100 rounded-lg px-2.5 py-1.5">
+                  <span
+                    className="material-symbols-outlined text-emerald-600 text-[14px]"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    check_circle
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-700">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* CSV Format Guide */}
+          <AnimatePresence>
+            {mode === 'csv' && (
+              <motion.section
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="glass-panel rounded-xl p-4 overflow-hidden"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[14px] text-violet-600">table_view</span>
+                  </div>
+                  <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">CSV Format</h2>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-3">
+                  Your CSV should have a header row with these columns:
+                </p>
+                <div className="space-y-1">
+                  {[
+                    { col: 'Full Name', note: 'or First Name + Last Name' },
+                    { col: 'Email', note: 'required' },
+                    { col: 'Phone', note: 'optional' },
+                    { col: 'Headline', note: 'current title / role' },
+                    { col: 'Location', note: 'city, country' },
+                    { col: 'Skills', note: 'semicolon-separated' },
+                    { col: 'LinkedIn', note: 'profile URL' },
+                    { col: 'GitHub', note: 'profile URL' },
+                  ].map((item) => (
+                    <div key={item.col} className="flex items-center justify-between bg-white/50 border border-slate-100 rounded-md px-2 py-1">
+                      <code className="text-[10px] font-bold text-indigo-700">{item.col}</code>
+                      <span className="text-[9px] text-slate-400 font-medium">{item.note}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+
+          {/* Privacy Info */}
+          <motion.section
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="glass-panel rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <span
+                  className="material-symbols-outlined text-[14px] text-emerald-600"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
+                  shield
+                </span>
+              </div>
+              <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Privacy</h2>
+            </div>
+            <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+              Candidate data is encrypted in transit and at rest. We maintain strict GDPR and CCPA compliance for all analyzed talent intelligence.
+            </p>
+          </motion.section>
+
+          {/* Quick Stats */}
+          {selectedJobId && (
+            <motion.section
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="glass-panel rounded-xl p-4"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <span
+                    className="material-symbols-outlined text-[14px] text-amber-600"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    work
+                  </span>
+                </div>
+                <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Target Role</h2>
+              </div>
+              {(() => {
+                const job = jobs.find((j) => j._id === selectedJobId);
+                if (!job) return null;
+                return (
+                  <div className="space-y-2">
+                    <p className="text-[12px] font-bold text-slate-900">{job.title}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white/50 border border-slate-100 rounded-lg p-2">
+                        <p className="text-[16px] font-extrabold text-slate-900 tabular-nums leading-none">{job.applicantCount}</p>
+                        <p className="text-[8px] uppercase tracking-widest font-bold text-slate-400 mt-0.5">current</p>
                       </div>
-                      {item.status === 'failed' && item.reason && (
-                        <p className="text-xs text-error mt-1">{item.reason}</p>
-                      )}
-                      <div className="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden mt-2">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${
-                            item.status === 'failed'
-                              ? 'bg-error'
-                              : 'bg-gradient-to-r from-secondary to-tertiary-container'
-                          }`}
-                          style={{ width: `${item.progress}%` }}
-                        />
+                      <div className="bg-white/50 border border-slate-100 rounded-lg p-2">
+                        <p className="text-[16px] font-extrabold text-emerald-600 tabular-nums leading-none">{job.screenedCount}</p>
+                        <p className="text-[8px] uppercase tracking-widest font-bold text-slate-400 mt-0.5">screened</p>
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                );
+              })()}
+            </motion.section>
+          )}
         </div>
-
-        <div className="space-y-6">
-          <div className="bg-primary-container text-white p-8 rounded-xl relative overflow-hidden">
-            <div className="absolute -right-8 -top-8 w-32 h-32 bg-secondary opacity-20 rounded-full blur-3xl" />
-            <span className="material-symbols-outlined text-secondary-fixed text-4xl mb-4">
-              psychology
-            </span>
-            <h4 className="text-xl font-bold mb-4">Structured Extraction</h4>
-            <p className="text-on-primary-container text-sm leading-relaxed mb-6">
-              Every resume is parsed by Gemini into the Umurava Talent Profile Schema — skills with
-              level and years, languages with proficiency, structured experience, education,
-              projects, and availability.
-            </p>
-            <ul className="space-y-4">
-              <li className="flex items-center gap-3 text-xs font-medium text-primary-fixed">
-                <span className="material-symbols-outlined text-lg text-secondary">check_circle</span>
-                Semantic Skill Mapping
-              </li>
-              <li className="flex items-center gap-3 text-xs font-medium text-primary-fixed">
-                <span className="material-symbols-outlined text-lg text-secondary">check_circle</span>
-                Experience Normalization
-              </li>
-              <li className="flex items-center gap-3 text-xs font-medium text-primary-fixed">
-                <span className="material-symbols-outlined text-lg text-secondary">check_circle</span>
-                Availability Inference
-              </li>
-            </ul>
-          </div>
-
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-outline-variant/10">
-            <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-4">
-              shield_lock
-            </span>
-            <h4 className="text-xl font-bold text-on-surface mb-4">Privacy Standards</h4>
-            <p className="text-on-surface-variant text-sm leading-relaxed">
-              Candidate data is encrypted in transit and at rest. We maintain strict GDPR and
-              CCPA compliance for all analyzed talent intelligence.
-            </p>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

@@ -45,6 +45,9 @@ interface DashboardStats {
   averageMatchCount: number;
   recentJobs: Job[];
   topTalents: TopTalent[];
+  applicationTrend: Array<{ date: string; count: number }>;
+  recommendationSplit: { hire: number; consider: number; risky: number };
+  pipeline: { applied: number; screened: number; shortlisted: number };
 }
 
 interface JobsState {
@@ -77,7 +80,7 @@ export const fetchDashboardStats = createAsyncThunk('jobs/fetchDashboardStats', 
 export const fetchJobs = createAsyncThunk(
   'jobs/fetchJobs',
   async (
-    params: { status?: string; page?: number; limit?: number; sort?: string } = {}
+    params: { status?: string; experienceLevel?: string; page?: number; limit?: number; sort?: string } = {}
   ) => {
     const res = await api.get('/jobs', { params });
     return res.data;

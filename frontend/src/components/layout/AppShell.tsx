@@ -4,6 +4,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import PageTransition from './PageTransition';
+import AppCursor from './AppCursor';
 import ScreeningProgressBanner from '../screening/ScreeningProgressBanner';
 import { useAppSelector } from '../../store/hooks';
 
@@ -23,18 +25,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isPublic, user, bootstrapped, router]);
 
-  // Public routes: render without admin chrome
   if (isPublic) {
-    return <>{children}</>;
+    return (
+      <>
+        <AppCursor />
+        <PageTransition>{children}</PageTransition>
+        <ScreeningProgressBanner />
+      </>
+    );
   }
 
-  // Gate while auth bootstraps OR while redirecting
   if (!bootstrapped || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center mesh-bg">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-          <p className="text-sm font-semibold text-slate-500">Loading Umurava Lens...</p>
+          <p className="text-sm font-semibold text-slate-500">Loading Umurava Lens…</p>
         </div>
       </div>
     );
@@ -42,10 +48,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <AppCursor />
       <Sidebar />
-      <main className="ml-64 min-h-screen">
+      <main className="ml-52 min-h-screen mesh-bg">
         <Topbar />
-        <div className="pt-24 px-8 pb-12">{children}</div>
+        <div className="pt-16 px-6 pb-10">
+          <PageTransition>{children}</PageTransition>
+        </div>
       </main>
       <ScreeningProgressBanner />
     </>

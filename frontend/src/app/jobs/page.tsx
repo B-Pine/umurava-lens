@@ -3,12 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchJobs, deleteJob } from '../../store/jobsSlice';
 import { runScreening } from '../../store/screeningSlice';
-import FilterBar from '../../components/ui/FilterBar';
-import { CardSkeleton } from '../../components/ui/LoadingSkeleton';
-import EmptyState from '../../components/ui/EmptyState';
 
 export default function JobsPage() {
   const dispatch = useAppDispatch();
@@ -19,20 +17,18 @@ export default function JobsPage() {
   const [status, setStatus] = useState('');
   const [experience, setExperience] = useState('');
   const [sort, setSort] = useState('newest');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('jobsView') : null;
-    if (stored === 'grid' || stored === 'list') setView(stored);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') localStorage.setItem('jobsView', view);
-  }, [view]);
-
-  useEffect(() => {
-    dispatch(fetchJobs({ status: status || undefined, page: 1, limit: 10, sort: sort === 'applicants' ? 'applicants' : undefined }));
-  }, [dispatch, status, sort]);
+    dispatch(
+      fetchJobs({
+        status: status || undefined,
+        experienceLevel: experience || undefined,
+        page: 1,
+        limit: 12,
+        sort: sort === 'applicants' ? 'applicants' : undefined,
+      }) as any
+    );
+  }, [dispatch, status, experience, sort]);
 
   const [activeScreeningId, setActiveScreeningId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -52,8 +48,6 @@ export default function JobsPage() {
   const handleRunScreening = async (jobId: string) => {
     const job = jobs.find((j) => j._id === jobId);
     setActiveScreeningId(jobId);
-    // Don't await — the sticky progress banner shows status globally.
-    // The user is free to navigate; they'll be notified on completion.
     dispatch(
       runScreening({
         jobId,
@@ -72,273 +66,336 @@ export default function JobsPage() {
     }
   };
 
+  const statusStyles: Record<string, string> = {
+    active: 'bg-emerald-50 text-emerald-700',
+    draft: 'bg-slate-100 text-slate-600',
+    closed: 'bg-rose-50 text-rose-700',
+  };
+
+  const hasFilters = status || experience || sort !== 'newest';
+  const clearFilters = () => {
+    setStatus('');
+    setExperience('');
+    setSort('newest');
+  };
+
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+    <div className="space-y-4">
+      {/* HEADER */}
+      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-on-primary-fixed">Jobs</h2>
-          <p className="text-on-surface-variant mt-1">Manage and track all job postings</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-tight">Jobs</h1>
+          <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+            <span className="tabular-nums">{total}</span>{' '}
+            {total === 1 ? 'role' : 'roles'} in the system
+          </p>
         </div>
         <Link
           href="/jobs/create"
-          className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-md font-semibold text-sm shadow-lg hover:opacity-90 active:scale-95 transition-all"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 transition press"
         >
-          <span className="material-symbols-outlined text-lg">add</span>
-          <span>Create Job</span>
+          <span className="material-symbols-outlined text-[14px]">add</span>
+          Create role
         </Link>
-      </div>
+      </section>
 
-      {/* Filter Bar */}
-      <FilterBar
-        filters={[
-          {
-            label: 'Status',
-            value: status,
-            onChange: setStatus,
-            options: [
-              { value: '', label: 'All' },
-              { value: 'active', label: 'Active' },
-              { value: 'draft', label: 'Draft' },
-              { value: 'closed', label: 'Closed' },
-            ],
-          },
-          {
-            label: 'Experience',
-            value: experience,
-            onChange: setExperience,
-            options: [
-              { value: '', label: 'All Levels' },
-              { value: 'Junior', label: 'Junior' },
-              { value: 'Mid-level', label: 'Mid-level' },
-              { value: 'Senior', label: 'Senior' },
-              { value: 'Director', label: 'Director' },
-            ],
-          },
-        ]}
-        sortValue={sort}
-        sortOptions={[
-          { value: 'newest', label: 'Newest First' },
-          { value: 'applicants', label: 'Most candidates' },
-        ]}
-        onSortChange={setSort}
-      />
-
-      {/* View toggle */}
-      <div className="flex justify-end mb-4">
-        <div className="inline-flex bg-surface-container-low rounded-lg p-1">
-          <button
-            onClick={() => setView('grid')}
-            title="Grid view"
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${view === 'grid' ? 'bg-surface text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            <span className="material-symbols-outlined text-lg">grid_view</span>
-          </button>
-          <button
-            onClick={() => setView('list')}
-            title="List view"
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${view === 'list' ? 'bg-surface text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            <span className="material-symbols-outlined text-lg">view_list</span>
-          </button>
+      {/* FILTERS */}
+      <section className="glass-panel rounded-xl p-3">
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-2 items-end">
+          <div className="md:col-span-3">
+            <label className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg px-2.5 h-8 text-[12px] font-medium text-slate-900 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+            >
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div className="md:col-span-3">
+            <label className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Experience</label>
+            <select
+              value={experience}
+              onChange={(e) => setExperience(e.target.value)}
+              className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg px-2.5 h-8 text-[12px] font-medium text-slate-900 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+            >
+              <option value="">All levels</option>
+              <option value="Junior">Junior</option>
+              <option value="Mid-level">Mid-level</option>
+              <option value="Senior">Senior</option>
+              <option value="Director">Director</option>
+              <option value="Executive">Executive</option>
+            </select>
+          </div>
+          <div className="md:col-span-3">
+            <label className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Sort</label>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="w-full mt-1 bg-white border border-slate-200/80 rounded-lg px-2.5 h-8 text-[12px] font-medium text-slate-900 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+            >
+              <option value="newest">Newest first</option>
+              <option value="applicants">Most candidates</option>
+            </select>
+          </div>
+          {hasFilters && (
+            <div className="md:col-span-3 flex md:justify-end items-center">
+              <button
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+                Clear
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Job Cards Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
+      {/* GRID */}
+      {loading && jobs.length === 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-40 rounded-xl bg-white/60 animate-pulse" />
+          ))}
         </div>
       ) : jobs.length === 0 ? (
-        <EmptyState
-          icon="work_off"
-          title="No Jobs Found"
-          description="Create your first job posting to start finding top talent."
-          action={{ label: 'Create Job', onClick: () => router.push('/jobs/create') }}
-        />
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {jobs.map((job) => {
-            const statusColor =
-              job.status === 'active' ? 'bg-secondary text-white' :
-              job.status === 'draft' ? 'bg-surface-container-highest text-on-surface-variant' :
-              'bg-error text-white';
-            const stopNav = (e: React.MouseEvent) => {
-              e.preventDefault();
-              e.stopPropagation();
-            };
-            return (
-              <Link
-                key={job._id}
-                href={`/jobs/${job._id}`}
-                className="group bg-surface-container-lowest p-4 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] transition-all flex flex-col items-center text-center"
+        <div className="glass-panel rounded-xl p-10 text-center">
+          <span className="material-symbols-outlined text-3xl text-slate-400/70 mb-2 block">work_off</span>
+          <h3 className="text-[13px] font-bold text-slate-700">No jobs match your filters</h3>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {hasFilters ? 'Try clearing the filters.' : 'Create your first role to start screening.'}
+          </p>
+          <div className="mt-4">
+            {hasFilters ? (
+              <button
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-slate-200 text-slate-900 text-[11px] font-semibold hover:border-slate-300"
               >
-                {/* File icon with status flag */}
-                <div className="relative mb-3">
-                  <div className="w-28 h-32 rounded-md bg-linear-to-br from-primary-fixed to-secondary-fixed flex items-center justify-center group-hover:scale-[1.03] transition-transform">
-                    <span className="material-symbols-outlined text-7xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      description
-                    </span>
-                  </div>
-                  <span className={`absolute -top-1 -right-1.5 px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase tracking-wide shadow ${statusColor}`}>
-                    {job.status}
-                  </span>
-                </div>
-
-                {/* Title + inline three-dots */}
-                <div className="w-full flex items-start justify-between gap-1">
-                  <h3 className="flex-1 text-sm font-bold text-on-surface line-clamp-2 leading-tight text-left">
-                    {job.title}
-                  </h3>
-                  <div className="relative shrink-0" ref={openMenuId === job._id ? menuRef : null}>
-                    <button
-                      onClick={(e) => {
-                        stopNav(e);
-                        setOpenMenuId(openMenuId === job._id ? null : job._id);
-                      }}
-                      title="More actions"
-                      className="w-6 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-base">more_vert</span>
-                    </button>
-                    {openMenuId === job._id && (
-                      <div
-                        onClick={stopNav}
-                        className="absolute top-full right-0 mt-1 w-36 bg-surface rounded-lg shadow-lg border border-outline-variant/20 z-10 overflow-hidden text-left"
-                      >
-                        <button
-                          onClick={(e) => {
-                            stopNav(e);
-                            setOpenMenuId(null);
-                            handleRunScreening(job._id);
-                          }}
-                          disabled={screening || job.applicantCount === 0 || job.status !== 'active'}
-                          className="w-full px-3 py-2 text-xs font-semibold flex items-center gap-2 text-on-surface hover:bg-secondary/10 hover:text-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            {screening && activeScreeningId === job._id ? 'progress_activity' : 'auto_awesome'}
-                          </span>
-                          {screening && activeScreeningId === job._id ? 'Running...' : 'Run Screening'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            stopNav(e);
-                            setOpenMenuId(null);
-                            handleDeleteJob(job._id, job.title);
-                          }}
-                          className="w-full px-3 py-2 text-xs font-semibold flex items-center gap-2 text-on-surface hover:bg-error/10 hover:text-error transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                Clear filters
+              </button>
+            ) : (
+              <Link
+                href="/jobs/create"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[11px] font-semibold press"
+              >
+                <span className="material-symbols-outlined text-[14px]">add</span>
+                Create role
               </Link>
-            );
-          })}
+            )}
+          </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {jobs.map((job) => {
-            const statusColor =
-              job.status === 'active' ? 'bg-secondary text-white' :
-              job.status === 'draft' ? 'bg-surface-container-highest text-on-surface-variant' :
-              'bg-error text-white';
-            return (
-              <div
-                key={job._id}
-                className="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 hover:shadow-md transition-all"
-              >
-                <div className="relative shrink-0">
-                  <div className="w-12 h-14 rounded-md bg-linear-to-br from-primary-fixed to-secondary-fixed flex items-center justify-center">
-                    <span className="material-symbols-outlined text-2xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      description
-                    </span>
-                  </div>
-                  <span className={`absolute -top-1 -right-1 px-1.5 py-px text-[8px] font-extrabold rounded uppercase tracking-wide shadow ${statusColor}`}>
-                    {job.status}
-                  </span>
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+          <AnimatePresence initial={false}>
+            {jobs.map((job, idx) => {
+              const progress =
+                job.applicantCount > 0
+                  ? Math.round((job.screenedCount / job.applicantCount) * 100)
+                  : 0;
+              const stCls = statusStyles[job.status] || statusStyles.draft;
+              const isActiveScreening = screening && activeScreeningId === job._id;
 
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-on-surface truncate">{job.title}</h4>
-                  <p className="text-xs text-on-surface-variant truncate">
-                    {(job.description || 'No description').split(/\n/)[0]}
-                  </p>
-                  <div className="flex gap-4 mt-1 text-[10px] font-semibold text-on-surface-variant">
-                    <span>{job.applicantCount} applied</span>
-                    <span>{job.screenedCount} screened</span>
-                    <span>{job.shortlistedCount} shortlisted</span>
+              return (
+                <motion.div
+                  key={job._id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ delay: Math.min(idx * 0.03, 0.25), duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative glass-panel rounded-xl p-3 press group"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <Link href={`/jobs/${job._id}`} className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${stCls}`}>
+                          {job.status}
+                        </span>
+                        {job.experienceLevel && (
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                            · {job.experienceLevel}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-[13px] font-extrabold text-slate-900 leading-tight tracking-tight line-clamp-2 mb-0.5">
+                        {job.title}
+                      </h3>
+                      <p className="text-[10px] text-slate-500 font-medium truncate">
+                        {job.location} · {job.employmentType}
+                      </p>
+                    </Link>
+                    <div className="relative shrink-0" ref={openMenuId === job._id ? menuRef : null}>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === job._id ? null : job._id);
+                        }}
+                        title="More actions"
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">more_vert</span>
+                      </button>
+                      {openMenuId === job._id && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                          className="absolute top-full right-0 mt-1 w-40 bg-white rounded-lg overflow-hidden z-20 shadow-[0_8px_30px_-4px_rgba(15,23,42,0.15),0_2px_6px_-1px_rgba(15,23,42,0.08)] border border-slate-200/80"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              handleRunScreening(job._id);
+                            }}
+                            disabled={screening || job.applicantCount === 0 || job.status !== 'active'}
+                            className="w-full px-3 py-2 text-[11px] font-semibold flex items-center gap-2 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">
+                              {isActiveScreening ? 'progress_activity' : 'auto_awesome'}
+                            </span>
+                            {isActiveScreening ? 'Running…' : 'Run screening'}
+                          </button>
+                          <Link
+                            href={`/jobs/${job._id}/shortlist`}
+                            onClick={() => setOpenMenuId(null)}
+                            className="w-full px-3 py-2 text-[11px] font-semibold flex items-center gap-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">workspace_premium</span>
+                            View shortlist
+                          </Link>
+                          <Link
+                            href={`/jobs/${job._id}/edit`}
+                            onClick={() => setOpenMenuId(null)}
+                            className="w-full px-3 py-2 text-[11px] font-semibold flex items-center gap-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
+                            Edit
+                          </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              handleDeleteJob(job._id, job.title);
+                            }}
+                            className="w-full px-3 py-2 text-[11px] font-semibold flex items-center gap-2 text-rose-600 hover:bg-rose-50 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                            Delete
+                          </button>
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-1">
-                  <Link
-                    href={`/jobs/${job._id}`}
-                    title="View more"
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-lg">visibility</span>
+                  {/* Stats strip */}
+                  <Link href={`/jobs/${job._id}`} className="block mt-2">
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100/80">
+                      <div>
+                        <p className="text-[13px] font-extrabold text-slate-900 tabular-nums leading-none">
+                          {job.applicantCount}
+                        </p>
+                        <p className="text-[8px] uppercase tracking-widest font-bold text-slate-400 mt-0.5">applied</p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-extrabold text-slate-900 tabular-nums leading-none">
+                          {job.screenedCount}
+                        </p>
+                        <p className="text-[8px] uppercase tracking-widest font-bold text-slate-400 mt-0.5">screened</p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-extrabold text-emerald-600 tabular-nums leading-none">
+                          {job.shortlistedCount}
+                        </p>
+                        <p className="text-[8px] uppercase tracking-widest font-bold text-slate-400 mt-0.5">shortlist</p>
+                      </div>
+                    </div>
+
+                    {/* Screening progress bar */}
+                    <div className="mt-2.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Screened</span>
+                        <span className="text-[9px] font-bold text-slate-600 tabular-nums">{progress}%</span>
+                      </div>
+                      <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-400"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                          transition={{ delay: 0.2 + idx * 0.03, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </div>
+                    </div>
                   </Link>
-                  <button
-                    onClick={() => handleRunScreening(job._id)}
-                    disabled={screening || job.applicantCount === 0 || job.status !== 'active'}
-                    title={job.applicantCount === 0 ? 'Upload candidates first' : 'Run AI screening'}
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-secondary/10 hover:text-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <span className="material-symbols-outlined text-lg">
-                      {screening && activeScreeningId === job._id ? 'progress_activity' : 'auto_awesome'}
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteJob(job._id, job.title)}
-                    title="Delete job"
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-lg">delete</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+
+                  {/* Action row */}
+                  <div className="flex items-center gap-1 mt-2.5 pt-2.5 border-t border-slate-100/80">
+                    <button
+                      onClick={() => handleRunScreening(job._id)}
+                      disabled={screening || job.applicantCount === 0 || job.status !== 'active'}
+                      title={job.applicantCount === 0 ? 'Upload candidates first' : 'Run AI screening'}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md bg-white border border-slate-200 text-[10.5px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {isActiveScreening ? 'progress_activity' : 'auto_awesome'}
+                      </span>
+                      {isActiveScreening ? 'Running' : 'Screen'}
+                    </button>
+                    <Link
+                      href={`/jobs/${job._id}/shortlist`}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md bg-slate-900 text-white text-[10.5px] font-semibold hover:bg-slate-800 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      Open
+                    </Link>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-12 flex items-center justify-between border-t border-surface-container-high pt-8">
-          <p className="text-sm text-on-surface-variant font-medium">
-            Showing {(page - 1) * 10 + 1}-{Math.min(page * 10, total)} of {total} job postings
+        <div className="flex items-center justify-between pt-4 border-t border-slate-200/60">
+          <p className="text-[11px] text-slate-500 font-medium">
+            Showing <span className="tabular-nums">{(page - 1) * 12 + 1}-{Math.min(page * 12, total)}</span> of{' '}
+            <span className="tabular-nums">{total}</span>
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <button
-              onClick={() => dispatch(fetchJobs({ page: page - 1 }))}
+              onClick={() => dispatch(fetchJobs({ page: page - 1, limit: 12 }) as any)}
               disabled={page <= 1}
-              className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-50"
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-white transition-colors disabled:opacity-40"
             >
-              <span className="material-symbols-outlined">chevron_left</span>
+              <span className="material-symbols-outlined text-[14px]">chevron_left</span>
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map((p) => (
               <button
                 key={p}
-                onClick={() => dispatch(fetchJobs({ page: p }))}
-                className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold ${
-                  p === page ? 'bg-primary text-white' : 'border border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
-                } transition-colors`}
+                onClick={() => dispatch(fetchJobs({ page: p, limit: 12 }) as any)}
+                className={`w-7 h-7 flex items-center justify-center rounded-md text-[11px] font-bold transition-colors ${
+                  p === page
+                    ? 'bg-slate-900 text-white'
+                    : 'border border-slate-200 text-slate-600 hover:bg-white'
+                }`}
               >
                 {p}
               </button>
             ))}
             <button
-              onClick={() => dispatch(fetchJobs({ page: page + 1 }))}
+              onClick={() => dispatch(fetchJobs({ page: page + 1, limit: 12 }) as any)}
               disabled={page >= totalPages}
-              className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-50"
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-white transition-colors disabled:opacity-40"
             >
-              <span className="material-symbols-outlined">chevron_right</span>
+              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
             </button>
           </div>
         </div>

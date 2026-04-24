@@ -1,62 +1,77 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { logout } from '../../store/authSlice';
+import { usePathname } from 'next/navigation';
+import { motion } from 'motion/react';
+
+const ROUTE_TITLES: Record<string, { label: string; description?: string }> = {
+  '/dashboard': { label: 'Overview', description: 'Your recruiting command center' },
+  '/jobs': { label: 'Jobs', description: 'Manage open roles and screening pipelines' },
+  '/jobs/create': { label: 'New Role', description: 'Define the role to screen against' },
+  '/candidates': { label: 'Candidates', description: 'Everyone in your talent pool' },
+  '/candidates/upload': { label: 'Upload Candidates', description: 'Import resumes and profiles' },
+  '/shortlisted': { label: 'Shortlisted', description: 'Top-N candidates across all roles' },
+};
+
+function matchTitle(pathname: string) {
+  if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
+  if (pathname.startsWith('/jobs/') && pathname.endsWith('/shortlist'))
+    return { label: 'Shortlist', description: 'Ranked candidates for this role' };
+  if (pathname.startsWith('/jobs/') && pathname.endsWith('/compare'))
+    return { label: 'Compare', description: 'Side-by-side candidate analysis' };
+  if (pathname.startsWith('/jobs/') && pathname.endsWith('/edit'))
+    return { label: 'Edit Role', description: 'Tune job + AI weights' };
+  if (pathname.startsWith('/jobs/')) return { label: 'Job Details', description: '' };
+  return { label: '', description: '' };
+}
 
 export default function Topbar() {
-  const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { user } = useAppSelector((s) => s.auth);
-
-  const initials =
-    (user?.name || user?.email || 'U')
-      .split(/\s+/)
-      .map((p) => p[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || 'U';
-
-  const handleLogout = () => {
-    dispatch(logout());
-    router.replace('/login');
-  };
+  const pathname = usePathname() || '/';
+  const { label, description } = matchTitle(pathname);
 
   return (
-    <header className="fixed top-0 right-0 w-[calc(100%-16rem)] z-50 flex justify-between items-center px-8 h-16 glass-header border-b border-slate-100 shadow-sm text-sm">
-      <div className="flex-1 max-w-xl">
-        <div className="relative group">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-secondary transition-colors">
-            search
-          </span>
-          <input
-            className="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full focus:ring-2 focus:ring-secondary/20 transition-all text-on-surface"
-            placeholder="Search for jobs or candidates..."
-            type="text"
-          />
-        </div>
-      </div>
+    <header className="fixed top-0 right-0 w-[calc(100%-13rem)] z-50 h-12 glass-header border-b border-slate-200/60">
+      <div className="h-full px-6 flex items-center justify-between gap-6">
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, y: 3 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="min-w-0 flex items-baseline gap-2"
+        >
+          {label && (
+            <>
+              <h2 className="text-[13px] font-extrabold text-slate-900 tracking-tight leading-tight">
+                {label}
+              </h2>
+              {description && (
+                <p className="text-[11px] text-slate-500 font-medium truncate hidden md:block">
+                  · {description}
+                </p>
+              )}
+            </>
+          )}
+        </motion.div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-4 border-r border-slate-100 pr-6">
-          <button
-            onClick={handleLogout}
-            title="Sign out"
-            className="text-slate-600 hover:text-indigo-500 transition-all"
-          >
-            <span className="material-symbols-outlined">logout</span>
-          </button>
+        <div className="flex-1 max-w-sm">
+          <div className="relative group">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[14px]">
+              search
+            </span>
+            <input
+              className="w-full pl-8 pr-14 h-8 bg-white/70 border border-slate-200/80 rounded-lg text-[12px] placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300/80 transition-all"
+              placeholder="Search"
+              type="text"
+            />
+            <span className="hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded tracking-wider">
+              ⌘K
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="font-semibold text-on-surface leading-none">{user?.name || 'Recruiter'}</p>
-            <p className="text-[10px] text-on-surface-variant uppercase tracking-tighter">
-              {user?.role || 'Member'}
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-gradient-to-br from-secondary to-secondary-container flex items-center justify-center text-white font-bold text-sm">
-            {initials}
-          </div>
+
+        <div className="flex items-center gap-1">
+          <button className="w-8 h-8 rounded-lg text-slate-600 hover:bg-white/70 hover:text-indigo-600 transition-colors flex items-center justify-center border border-transparent hover:border-slate-200/60">
+            <span className="material-symbols-outlined text-[16px]">notifications</span>
+          </button>
         </div>
       </div>
     </header>

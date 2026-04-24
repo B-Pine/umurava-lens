@@ -82,9 +82,26 @@ export const deleteJob = async (req: Request, res: Response) => {
 
 export const getDashboardStats = async (_req: Request, res: Response) => {
   try {
-    const [activeJobs, totalScreened, recentJobs, scoreAgg, topResults] = await Promise.all([
+    // 14-day window for the application trend
+    const since = new Date();
+    since.setDate(since.getDate() - 13);
+    since.setHours(0, 0, 0, 0);
+
+    const [
+      activeJobs,
+      totalCandidates,
+      totalScreened,
+      totalShortlisted,
+      recentJobs,
+      scoreAgg,
+      topResults,
+      recSplit,
+      trendAgg,
+    ] = await Promise.all([
       Job.countDocuments({ status: 'active' }),
+      Candidate.countDocuments({}),
       Job.aggregate([{ $group: { _id: null, total: { $sum: '$screenedCount' } } }]),
+      Job.aggregate([{ $group: { _id: null, total: { $sum: '$shortlistedCount' } } }]),
       Job.find({ status: 'active' }).sort({ updatedAt: -1 }).limit(3),
       ScreeningResult.aggregate([
         { $group: { _id: null, avg: { $avg: '$score' }, count: { $sum: 1 } } },
@@ -94,9 +111,22 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
         .limit(15)
         .populate('candidateId', 'firstName lastName headline')
         .populate('jobId', 'title'),
+      ScreeningResult.aggregate([
+        { $group: { _id: '$recommendation', count: { $sum: 1 } } },
+      ]),
+      Candidate.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const screened = totalScreened.length > 0 ? totalScreened[0].total : 0;
+    const shortlisted = totalShortlisted.length > 0 ? totalShortlisted[0].total : 0;
     const averageMatchScore = scoreAgg.length > 0 ? Math.round(scoreAgg[0].avg * 10) / 10 : null;
     const averageMatchCount = scoreAgg.length > 0 ? scoreAgg[0].count : 0;
 
@@ -116,6 +146,26 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
         };
       });
 
+    const recommendationSplit = { hire: 0, consider: 0, risky: 0 } as Record<string, number>;
+    for (const entry of recSplit as Array<{ _id: string; count: number }>) {
+      if (entry._id && recommendationSplit[entry._id] !== undefined) {
+        recommendationSplit[entry._id] = entry.count;
+      }
+    }
+
+    // Build continuous 14-day series even for days with zero candidates.
+    const trendMap = new Map<string, number>();
+    for (const row of trendAgg as Array<{ _id: string; count: number }>) {
+      trendMap.set(row._id, row.count);
+    }
+    const applicationTrend: Array<{ date: string; count: number }> = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      applicationTrend.push({ date: key, count: trendMap.get(key) || 0 });
+    }
+
     res.json({
       activeJobCount: activeJobs,
       candidatesScreened: screened,
@@ -123,6 +173,13 @@ export const getDashboardStats = async (_req: Request, res: Response) => {
       averageMatchCount,
       recentJobs,
       topTalents,
+      applicationTrend,
+      recommendationSplit,
+      pipeline: {
+        applied: totalCandidates,
+        screened,
+        shortlisted,
+      },
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

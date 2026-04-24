@@ -10,9 +10,10 @@ import {
 
 interface Props {
   result: ScreeningResult;
+  variant?: 'outreach' | 'rejection';
 }
 
-export default function OutreachPanel({ result }: Props) {
+export default function OutreachPanel({ result, variant = 'outreach' }: Props) {
   const dispatch = useAppDispatch();
   const candidate = result.candidateId as any;
 
@@ -22,6 +23,7 @@ export default function OutreachPanel({ result }: Props) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     setSubject(result.emailSubject || '');
@@ -31,6 +33,11 @@ export default function OutreachPanel({ result }: Props) {
   const isSent = result.emailStatus === 'sent';
   const recipient = candidate?.email || '';
   const recipientName = [candidate?.firstName, candidate?.lastName].filter(Boolean).join(' ').trim();
+
+  const isRejection = variant === 'rejection';
+  const accentColor = isRejection ? 'rose' : 'indigo';
+  const iconBg = isRejection ? 'bg-rose-50' : 'bg-indigo-50';
+  const iconColor = isRejection ? 'text-rose-600' : 'text-indigo-600';
 
   const handleSave = async () => {
     setSaving(true);
@@ -84,95 +91,118 @@ export default function OutreachPanel({ result }: Props) {
   };
 
   return (
-    <div className="mt-8 rounded-2xl border border-outline-variant/40 bg-white overflow-hidden">
-      <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-            Outreach email
-          </h4>
-          <p className="text-sm font-semibold text-on-surface mt-0.5">
-            To: {recipientName || 'Unknown'}{' '}
-            <span className="text-on-surface-variant font-normal">&lt;{recipient || 'no email'}&gt;</span>
-          </p>
-        </div>
-        <span
-          className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full ${
-            isSent
-              ? 'bg-emerald-50 text-emerald-600'
-              : result.emailStatus === 'failed'
-                ? 'bg-rose-50 text-rose-600'
-                : 'bg-surface-container text-on-surface-variant'
-          }`}
-        >
-          {isSent ? 'Sent' : result.emailStatus === 'failed' ? 'Send failed' : 'Pending review'}
-        </span>
-      </div>
-
-      <div className="p-6 space-y-4">
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Subject
-          </label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            disabled={isSent}
-            className="mt-1 w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-secondary/30 disabled:opacity-60"
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Message
-          </label>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            disabled={isSent}
-            rows={Math.max(6, Math.min(14, body.split('\n').length + 1))}
-            className="mt-1 w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 text-sm font-medium leading-relaxed focus:outline-none focus:ring-2 focus:ring-secondary/30 disabled:opacity-60"
-          />
-        </div>
-
-        {feedback && (
-          <div className="text-xs font-semibold text-on-surface-variant bg-surface-container-low rounded-lg px-3 py-2 border border-outline-variant/30">
-            {feedback}
-            {previewUrl && (
-              <>
-                {' '}
-                <a
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-secondary underline"
-                >
-                  View preview
-                </a>
-              </>
-            )}
+    <div className="bg-white/70 border border-slate-100 rounded-lg overflow-hidden">
+      {/* Header - always visible */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <div className={`w-6 h-6 rounded-md ${iconBg} flex items-center justify-center`}>
+            <span className={`material-symbols-outlined text-[13px] ${iconColor}`}>
+              {isRejection ? 'mark_email_unread' : 'forward_to_inbox'}
+            </span>
           </div>
-        )}
-
-        <div className="flex flex-wrap gap-3 pt-2">
-          <button
-            onClick={handleSave}
-            disabled={saving || sending || isSent}
-            className="px-4 py-2 rounded-lg border border-outline-variant/40 text-sm font-bold text-on-surface bg-surface-container-lowest hover:bg-surface-container disabled:opacity-60"
-          >
-            {saving ? 'Saving…' : 'Save draft'}
-          </button>
-
-          <button
-            onClick={handleSend}
-            disabled={sending || isSent || !recipient || !body.trim()}
-            className="px-5 py-2 rounded-lg bg-secondary text-white text-sm font-bold shadow-md shadow-secondary/20 hover:bg-secondary/90 transition-colors disabled:opacity-60 inline-flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-sm">send</span>
-            {sending ? 'Sending…' : isSent ? 'Already sent' : 'Send email'}
-          </button>
+          <div className="text-left">
+            <p className="text-[11px] font-bold text-slate-900">
+              {isRejection ? 'Rejection Email' : 'Outreach Email'}
+            </p>
+            <p className="text-[9px] text-slate-500 font-medium">
+              To: {recipientName || 'Unknown'} &lt;{recipient || 'no email'}&gt;
+            </p>
+          </div>
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+              isSent
+                ? 'bg-emerald-50 text-emerald-600'
+                : result.emailStatus === 'failed'
+                  ? 'bg-rose-50 text-rose-600'
+                  : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {isSent ? 'Sent' : result.emailStatus === 'failed' ? 'Failed' : 'Draft'}
+          </span>
+          <span
+            className={`material-symbols-outlined text-[16px] text-slate-400 transition-transform ${
+              !collapsed ? 'rotate-180' : ''
+            }`}
+          >
+            expand_more
+          </span>
+        </div>
+      </button>
+
+      {/* Expandable content */}
+      {!collapsed && (
+        <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-slate-100/60">
+          {/* Subject */}
+          <div>
+            <label className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Subject</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              disabled={isSent}
+              className="mt-0.5 w-full bg-white border border-slate-200 rounded-md px-2.5 h-7 text-[11px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Body */}
+          <div>
+            <label className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Message</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              disabled={isSent}
+              rows={Math.max(4, Math.min(10, body.split('\n').length + 1))}
+              className="mt-0.5 w-full bg-white border border-slate-200 rounded-md px-2.5 py-2 text-[11px] font-medium text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Feedback */}
+          {feedback && (
+            <div className="flex items-start gap-2 p-2 rounded-md bg-slate-50 border border-slate-200">
+              <span className="material-symbols-outlined text-[12px] text-slate-500 mt-0.5 shrink-0">info</span>
+              <p className="text-[10px] font-medium text-slate-600">
+                {feedback}
+                {previewUrl && (
+                  <>
+                    {' '}
+                    <a href={previewUrl} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+                      View preview
+                    </a>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-2  pt-1">
+            <button
+              onClick={handleSave}
+              disabled={saving || sending || isSent}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-40 transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save draft'}
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={sending || isSent || !recipient || !body.trim()}
+              className={`inline-flex items-center gap-1 h-7 px-3 rounded-md text-white text-[10px] font-semibold disabled:opacity-40 transition press ${
+                isRejection
+                  ? 'bg-gradient-to-b from-rose-500 to-rose-600 shadow-[0_4px_12px_-4px_rgba(244,63,94,0.5),inset_0_1px_0_0_rgba(255,255,255,0.22)]'
+                  : 'bg-gradient-to-b from-indigo-500 to-indigo-600 shadow-[0_4px_12px_-4px_rgba(70,72,212,0.5),inset_0_1px_0_0_rgba(255,255,255,0.22)]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[12px]">send</span>
+              {sending ? 'Sending...' : isSent ? 'Sent' : 'Send'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

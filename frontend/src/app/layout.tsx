@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import ReduxProvider from '../store/Provider';
 import AppShell from '../components/layout/AppShell';
+import NavigationOriginProvider from '../components/layout/NavigationOrigin';
 
 export const metadata: Metadata = {
   title: 'Umurava Lens | AI Talent Intelligence',
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full bg-surface text-on-surface font-[family-name:var(--font-body)]">
         <ReduxProvider>
-          <AppShell>{children}</AppShell>
+          <NavigationOriginProvider>
+            <AppShell>{children}</AppShell>
+          </NavigationOriginProvider>
         </ReduxProvider>
       </body>
     </html>

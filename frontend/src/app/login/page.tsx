@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { login } from '../../store/authSlice';
 
@@ -33,76 +34,109 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-slate-50">
-      {/* Left brand panel */}
-      <div className="hidden lg:flex flex-col justify-between bg-indigo-600 text-white p-12 relative overflow-hidden">
-        <div className="absolute -top-20 -left-20 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-32 -right-20 w-[30rem] h-[30rem] rounded-full bg-indigo-400/20 blur-3xl" />
+    <div className="min-h-screen grid lg:grid-cols-2 mesh-bg">
+      {/* Left — poetic brand panel */}
+      <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 text-white p-12 relative overflow-hidden">
+        <div className="absolute -top-40 -left-24 w-[420px] h-[420px] rounded-full bg-indigo-400/30 blur-[120px] aurora-slow" />
+        <div className="absolute -bottom-32 -right-20 w-[480px] h-[480px] rounded-full bg-fuchsia-500/25 blur-[140px] aurora-slow" style={{ animationDelay: '-6s' }} />
+        <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-sky-400/15 blur-[100px] aurora-slow" style={{ animationDelay: '-12s' }} />
 
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="bg-white/10 p-2 rounded-lg border border-white/20">
-              <span className="material-symbols-outlined">visibility</span>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="relative"
+        >
+          <div className="flex items-center gap-3 mb-14">
+            <div className="relative">
+              <div className="absolute inset-0 bg-white/40 blur-xl rounded-full" />
+              <div className="relative w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xl border border-white/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  visibility
+                </span>
+              </div>
             </div>
             <div>
-              <h1 className="text-xl font-extrabold leading-tight">Umurava Lens</h1>
-              <p className="text-[10px] uppercase tracking-widest text-white/70 font-semibold">
+              <h1 className="text-lg font-extrabold leading-tight tracking-tight">Umurava Lens</h1>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/60 font-bold">
                 AI Talent Intelligence
               </p>
             </div>
           </div>
 
-          <h2 className="text-5xl font-extrabold leading-[1.1] mb-6">
+          <h2 className="text-5xl xl:text-6xl font-extrabold leading-[1.02] tracking-tight">
             Screen smarter.<br />
             Hire with context.
           </h2>
-          <p className="text-white/80 font-medium text-lg max-w-md">
-            Umurava Lens ranks candidates against your job criteria using Google Gemini — and always
-            leaves the final hiring decision to you.
+          <p className="text-white/75 font-medium text-lg max-w-md mt-6 leading-relaxed">
+            Evaluate an entire candidate pool in one pass, see why each person matches,
+            and let your team make the call.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="relative space-y-4 text-white/90 text-sm font-medium">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-white/70">check_circle</span>
-            Evaluate dozens of applicants in one pass
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-white/70">check_circle</span>
-            Explainable strengths and gaps per candidate
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-white/70">check_circle</span>
-            Recruiter-approved outreach emails, never auto-sent
-          </div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="relative space-y-4 text-white/85 text-sm font-medium"
+        >
+          {[
+            'Evaluate dozens of applicants in one pass',
+            'Explainable strengths and gaps per candidate',
+            'Review every outreach before it sends',
+          ].map((line, i) => (
+            <motion.div
+              key={line}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.35 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center gap-3"
+            >
+              <span className="material-symbols-outlined text-white/70 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                check_circle
+              </span>
+              {line}
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
 
-      {/* Right form */}
+      {/* Right — form */}
       <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-md"
+        >
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="bg-indigo-600 text-white p-2 rounded-lg">
-              <span className="material-symbols-outlined">visibility</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                visibility
+              </span>
             </div>
-            <h1 className="text-xl font-extrabold text-slate-900">Umurava Lens</h1>
+            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Umurava Lens</h1>
           </div>
 
-          <h2 className="text-3xl font-extrabold text-slate-900 mb-2">Recruiter sign in</h2>
+          <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">Welcome back</h2>
           <p className="text-slate-500 font-medium mb-8">
-            Use your admin credentials to access the recruiter workspace.
+            Sign in to the recruiter workspace.
           </p>
 
           {(error || localError) && (
-            <div className="mb-4 bg-rose-50 border border-rose-100 text-rose-700 text-sm font-semibold px-4 py-3 rounded-lg flex items-center gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 bg-rose-50 border border-rose-100 text-rose-700 text-sm font-semibold px-4 py-3 rounded-xl flex items-center gap-2"
+            >
               <span className="material-symbols-outlined text-base">error</span>
               {localError || error}
-            </div>
+            </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
                 Email
               </label>
               <input
@@ -110,13 +144,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@umurava.africa"
-                className="mt-1 w-full bg-white border border-slate-200 rounded-xl px-4 h-12 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                className="mt-1.5 w-full bg-white border border-slate-200 rounded-xl px-4 h-12 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
                 autoComplete="email"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
                 Password
               </label>
               <div className="relative">
@@ -125,7 +159,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="mt-1 w-full bg-white border border-slate-200 rounded-xl px-4 pr-12 h-12 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                  className="mt-1.5 w-full bg-white border border-slate-200 rounded-xl px-4 pr-12 h-12 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
                   autoComplete="current-password"
                 />
                 <button
@@ -140,29 +174,33 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button
+            <motion.button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-colors disabled:opacity-60"
+              whileHover={{ y: -1, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+              className="w-full h-12 mt-2 rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 text-white font-semibold shadow-[0_10px_30px_-10px_rgba(70,72,212,0.55),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Signing in...
+                  Signing in…
                 </span>
               ) : (
                 'Sign in'
               )}
-            </button>
+            </motion.button>
           </form>
 
-          <div className="mt-10 p-4 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 font-medium leading-relaxed">
+          <div className="mt-10 p-4 bg-slate-100/70 backdrop-blur border border-slate-200/70 rounded-xl text-xs text-slate-500 font-medium leading-relaxed">
             <p className="font-bold text-slate-700 mb-1">Demo credentials</p>
-            The seeded admin account is <span className="font-mono">admin@umurava.africa</span>.
-            The password is defined by the <span className="font-mono">SEED_ADMIN_PASSWORD</span>{' '}
-            env var (default <span className="font-mono">umurava-admin-2026</span>).
+            The seeded admin account is{' '}
+            <span className="font-mono text-slate-700">admin@umurava.africa</span>. The password is
+            defined by the <span className="font-mono">SEED_ADMIN_PASSWORD</span> env var (default{' '}
+            <span className="font-mono text-slate-700">umurava-admin-2026</span>).
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

@@ -87,6 +87,8 @@ export interface Candidate {
 interface CandidatesState {
   candidates: Candidate[];
   total: number;
+  page: number;
+  totalPages: number;
   loading: boolean;
   uploading: boolean;
   error: string | null;
@@ -95,6 +97,8 @@ interface CandidatesState {
 const initialState: CandidatesState = {
   candidates: [],
   total: 0,
+  page: 1,
+  totalPages: 1,
   loading: false,
   uploading: false,
   error: null,
@@ -181,6 +185,8 @@ const candidatesSlice = createSlice({
         state.loading = false;
         state.candidates = action.payload.candidates;
         state.total = action.payload.total;
+        state.page = action.payload.page || 1;
+        state.totalPages = action.payload.totalPages || 1;
       })
       .addCase(fetchCandidates.rejected, (state, action) => {
         state.loading = false;
