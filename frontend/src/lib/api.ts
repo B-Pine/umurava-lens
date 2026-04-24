@@ -32,6 +32,12 @@ api.interceptors.response.use(
         }
       }
     }
+    
+    // Unpack backend API error message if available so Redux reducers show it instead of "Request failed with status code 503"
+    if (err?.response?.data?.error) {
+      err.message = err.response.data.error;
+    }
+    
     return Promise.reject(err);
   }
 );

@@ -49,7 +49,6 @@ export default function CreateJobPage() {
   const [shortlistCap, setShortlistCap] = useState<10 | 20>(20);
   const [applicationDeadline, setApplicationDeadline] = useState('');
   const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [showErrors, setShowErrors] = useState(false);
 
   const addSkill = (skill: string) => {
@@ -71,33 +70,16 @@ export default function CreateJobPage() {
   const step1Valid = Object.values(step1Err).every((e) => !e);
   const step3Valid = Object.values(step3Err).every((e) => !e);
 
-  const handleNext = () => {
-    if (step === 1 && !step1Valid) {
-      setShowErrors(true);
-      return;
-    }
-    setShowErrors(false);
-    setStep((s) => (Math.min(s + 1, 3) as 1 | 2 | 3));
-  };
-
-  const handleBack = () => setStep((s) => (Math.max(s - 1, 1) as 1 | 2 | 3));
-
   const handleSubmit = async (asDraft: boolean) => {
     if (asDraft) {
       if (!title.trim()) {
         setShowErrors(true);
-        setStep(1);
         return;
       }
     } else {
-      if (!step1Valid) {
+      if (!step1Valid || !step3Valid) {
         setShowErrors(true);
-        setStep(1);
-        return;
-      }
-      if (!step3Valid) {
-        setShowErrors(true);
-        setStep(3);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
     }
@@ -128,14 +110,8 @@ export default function CreateJobPage() {
     }
   };
 
-  const steps = [
-    { n: 1 as const, label: 'Details' },
-    { n: 2 as const, label: 'AI Weights' },
-    { n: 3 as const, label: 'Skills & Config' },
-  ];
-
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="space-y-4 w-full">
       {/* HEADER */}
       <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
@@ -159,57 +135,10 @@ export default function CreateJobPage() {
         </button>
       </section>
 
-      {/* STEP NAV */}
-      <section className="glass-panel rounded-xl p-2.5">
-        <div className="flex items-center gap-1">
-          {steps.map((s, idx) => {
-            const isActive = step === s.n;
-            const isDone = step > s.n;
-            return (
-              <div key={s.n} className="flex-1 flex items-center gap-1">
-                <button
-                  onClick={() => {
-                    if (s.n > 1 && !step1Valid) {
-                      setShowErrors(true);
-                      setStep(1);
-                      return;
-                    }
-                    setStep(s.n);
-                  }}
-                  className={`flex-1 relative flex items-center gap-2 h-8 px-3 rounded-lg text-[11px] font-bold transition-colors ${
-                    isActive
-                      ? 'bg-slate-900 text-white'
-                      : isDone
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-white/60 text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      isActive ? 'bg-white text-slate-900' : isDone ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {isDone ? '✓' : s.n}
-                  </div>
-                  <span className="uppercase tracking-widest text-[10px]">{s.label}</span>
-                </button>
-                {idx < steps.length - 1 && (
-                  <span className="material-symbols-outlined text-slate-300 text-[14px]">chevron_right</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* STEP CONTENT */}
-      <motion.div
-        key={step}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      >
-        {step === 1 && (
+      {/* MAIN CONTENT */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="xl:col-span-2">
           <Step1
             title={title}
             setTitle={setTitle}
@@ -230,13 +159,12 @@ export default function CreateJobPage() {
             showErrors={showErrors}
             step1Err={step1Err}
           />
-        )}
+        </div>
 
-        {step === 2 && (
+        {/* Right Column */}
+        <div className="space-y-6">
           <Step2 weights={weights} setWeights={setWeights} passingScore={passingScore} setPassingScore={setPassingScore} />
-        )}
-
-        {step === 3 && (
+          
           <Step3
             skills={skills}
             removeSkill={removeSkill}
@@ -248,48 +176,26 @@ export default function CreateJobPage() {
             showErrors={showErrors}
             step3Err={step3Err}
           />
-        )}
-      </motion.div>
-
-      {/* FOOTER */}
-      <section className="glass-panel rounded-xl p-2.5 flex items-center justify-between">
-        <button
-          onClick={handleBack}
-          disabled={step === 1}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/70 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <span className="material-symbols-outlined text-[14px]">arrow_back</span>
-          Back
-        </button>
-
-        <div className="flex gap-2">
-          {step < 3 ? (
-            <button
-              onClick={handleNext}
-              className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 transition press"
-            >
-              Next
-              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => router.push('/jobs')}
-                className="inline-flex items-center h-8 px-3 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 press"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleSubmit(false)}
-                disabled={saving || !step1Valid || !step3Valid}
-                className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition press"
-              >
-                {saving ? 'Publishing…' : 'Publish role'}
-                <span className="material-symbols-outlined text-[14px]">check</span>
-              </button>
-            </>
-          )}
         </div>
+      </div>
+
+      {/* FOOTER ACTION BAR */}
+      <section className="glass-panel rounded-xl p-3 flex items-center justify-end gap-3 mt-4">
+        <button
+          onClick={() => router.push('/jobs')}
+          disabled={saving}
+          className="inline-flex items-center h-9 px-4 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-40 transition-colors press"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => handleSubmit(false)}
+          disabled={saving || !step1Valid || !step3Valid}
+          className="inline-flex items-center gap-1.5 h-9 px-5 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white text-[12px] font-semibold shadow-[0_6px_16px_-8px_rgba(70,72,212,0.6),inset_0_1px_0_0_rgba(255,255,255,0.22)] hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition press"
+        >
+          {saving ? 'Publishing…' : 'Publish role'}
+          <span className="material-symbols-outlined text-[15px]">check</span>
+        </button>
       </section>
     </div>
   );

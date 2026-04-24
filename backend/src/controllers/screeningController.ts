@@ -83,8 +83,23 @@ export const runScreening = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Screening error:', error);
-    res.status(500).json({
-      error: 'AI screening failed. Please try again.',
+    
+    let friendlyMessage = 'AI screening failed. Please try again.';
+    let statusCode = 500;
+
+    // Provide friendly messages for common Gemini upstream errors
+    if (error.message?.includes('503 Service Unavailable') || error.message?.includes('overload')) {
+      friendlyMessage = 'Google AI models are currently experiencing extremely high demand. Please try again in a few moments.';
+      statusCode = 503;
+    } else if (error.message?.includes('429 Too Many Requests')) {
+      friendlyMessage = 'AI request limit reached. Please wait a moment and try again.';
+      statusCode = 429;
+    } else if (error.message?.includes('JSON')) {
+      friendlyMessage = 'AI returned an unexpected format. Please try screening again.';
+    }
+
+    res.status(statusCode).json({
+      error: friendlyMessage,
       details: error.message,
     });
   }

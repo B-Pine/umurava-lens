@@ -317,44 +317,30 @@ export default function JobsPage() {
                       </div>
                     </div>
 
-                    {/* Screening progress bar */}
-                    <div className="mt-2.5">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Screened</span>
-                        <span className="text-[9px] font-bold text-slate-600 tabular-nums">{progress}%</span>
-                      </div>
-                      <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-400"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${progress}%` }}
-                          transition={{ delay: 0.2 + idx * 0.03, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                        />
-                      </div>
+                    {/* Action row */}
+                    <div className="flex items-center gap-1 mt-3 pt-3 border-t border-slate-100/80">
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRunScreening(job._id); }}
+                        disabled={screening || job.applicantCount === 0 || job.status !== 'active'}
+                        title={job.applicantCount === 0 ? 'Upload candidates first' : 'Run AI screening'}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md bg-white border border-slate-200 text-[10.5px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {isActiveScreening ? 'progress_activity' : 'auto_awesome'}
+                        </span>
+                        {isActiveScreening ? 'Running' : 'Screen'}
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/jobs/${job._id}/shortlist`; }}
+                        className="group/btn relative inline-flex items-center justify-center h-7 px-1.5 rounded-md bg-slate-900 text-white text-[10.5px] font-semibold hover:bg-slate-800 transition-all duration-300 ease-out"
+                      >
+                        <span className="material-symbols-outlined text-[14px] z-10 relative">arrow_forward</span>
+                        <span className="overflow-hidden max-w-0 opacity-0 group-hover/btn:max-w-[40px] group-hover/btn:opacity-100 group-hover/btn:ml-1 -translate-x-3 group-hover/btn:translate-x-0 transition-all duration-300 ease-out whitespace-nowrap">
+                          Open
+                        </span>
+                      </button>
                     </div>
                   </Link>
-
-                  {/* Action row */}
-                  <div className="flex items-center gap-1 mt-2.5 pt-2.5 border-t border-slate-100/80">
-                    <button
-                      onClick={() => handleRunScreening(job._id)}
-                      disabled={screening || job.applicantCount === 0 || job.status !== 'active'}
-                      title={job.applicantCount === 0 ? 'Upload candidates first' : 'Run AI screening'}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md bg-white border border-slate-200 text-[10.5px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">
-                        {isActiveScreening ? 'progress_activity' : 'auto_awesome'}
-                      </span>
-                      {isActiveScreening ? 'Running' : 'Screen'}
-                    </button>
-                    <Link
-                      href={`/jobs/${job._id}/shortlist`}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md bg-slate-900 text-white text-[10.5px] font-semibold hover:bg-slate-800 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                      Open
-                    </Link>
-                  </div>
                 </motion.div>
               );
             })}
