@@ -188,8 +188,18 @@ function parseCsvBuffer(buffer: Buffer): Promise<any[]> {
 
 /**
  * Flexible CSV column mapping — accepts a variety of common column names and
- * maps them onto the Talent Profile Schema. Comma-separated list columns are
- * split on commas and semicolons.
+ * maps them onto the Talent Profile Schema.
+ *
+ * Simple list columns (Skills, Languages) are split on commas or semicolons.
+ *
+ * Rich record columns (Experience, Projects, Education) use:
+ *   - `||` between records
+ *   - `|` between fields within a record
+ *   - `;` between tags inside the "technologies" sub-field
+ *
+ * Experience fields:   Company|Role|Start|End|Description|Tech1;Tech2
+ * Projects fields:     Name|Description|Tech1;Tech2|Role|Link
+ * Education fields:    Institution|Degree|FieldOfStudy|StartYear|EndYear
  */
 function rowToCandidate(row: Record<string, string>): any | null {
   const get = (...keys: string[]): string => {
@@ -224,6 +234,39 @@ function rowToCandidate(row: Record<string, string>): any | null {
   const skillsRaw = splitList(get('skills', 'skill'));
   const languagesRaw = splitList(get('languages', 'language'));
 
+  const experience = parseMultiRecord(
+    get('experience', 'work experience', 'work history'),
+    ['company', 'role', 'startDate', 'endDate', 'description', 'technologies']
+  );
+  const projects = parseMultiRecord(
+    get('projects', 'project', 'portfolio'),
+    ['name', 'description', 'technologies', 'role', 'link']
+  );
+  const education = parseMultiRecord(get('education', 'school'), [
+    'institution',
+    'degree',
+    'fieldOfStudy',
+    'startYear',
+    'endYear',
+  ]);
+  const certifications = parseMultiRecord(get('certifications', 'certification'), [
+    'name',
+    'issuer',
+    'issueDate',
+  ]);
+
+  const availabilityStatus = get('availability status', 'availability') || 'Open to Opportunities';
+  const availabilityType = get('availability type', 'employment type', 'work type') || 'Full-time';
+
+  // If a Years Experience hint is provided but experience[] is empty, stamp it
+  // onto the skills so the AI still has the number visible.
+  const yearsHint = parseInt(get('years experience', 'years of experience', 'years'), 10);
+  const enrichedSkills = skillsRaw.map((name, idx) => ({
+    name,
+    level: 'Intermediate' as const,
+    yearsOfExperience: idx === 0 && !isNaN(yearsHint) ? yearsHint : 0,
+  }));
+
   return normalizeCandidate({
     firstName,
     lastName,
@@ -232,15 +275,15 @@ function rowToCandidate(row: Record<string, string>): any | null {
     headline: get('headline', 'title', 'current title', 'role'),
     bio: get('bio', 'summary', 'about'),
     location: get('location', 'city', 'country'),
-    skills: skillsRaw.map((name) => ({ name, level: 'Intermediate', yearsOfExperience: 0 })),
-    languages: languagesRaw.map((name) => ({ name, proficiency: 'Conversational' })),
-    education: [],
-    experience: [],
-    projects: [],
-    certifications: [],
+    skills: enrichedSkills,
+    languages: languagesRaw.map((name) => ({ name, proficiency: 'Conversational' as const })),
+    education,
+    experience,
+    projects,
+    certifications,
     availability: {
-      status: 'Open to Opportunities',
-      type: 'Full-time',
+      status: availabilityStatus,
+      type: availabilityType,
     },
     socialLinks: {
       linkedin: get('linkedin', 'linkedin url'),
@@ -248,6 +291,43 @@ function rowToCandidate(row: Record<string, string>): any | null {
       portfolio: get('portfolio', 'website'),
     },
   });
+}
+
+function parseMultiRecord(raw: string, fields: string[]): any[] {
+  if (!raw) return [];
+  return raw
+    .split('||')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const parts = entry.split('|').map((s) => s.trim());
+      const obj: any = {};
+      fields.forEach((f, i) => {
+        const v = parts[i] || '';
+        if (f === 'technologies') {
+          obj[f] = v
+            .split(/[;,]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+        } else if (f === 'startYear' || f === 'endYear') {
+          const n = parseInt(v, 10);
+          obj[f] = isNaN(n) ? 0 : n;
+        } else {
+          obj[f] = v;
+        }
+      });
+      if (fields.includes('endDate')) {
+        obj.isCurrent = !obj.endDate || /present|current|now|ongoing/i.test(obj.endDate);
+      }
+      // Drop entries where every populated field is empty/array-empty.
+      const hasContent = Object.values(obj).some((v) => {
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'number') return v > 0;
+        return Boolean(v);
+      });
+      return hasContent ? obj : null;
+    })
+    .filter((x): x is any => x !== null);
 }
 
 export const getCandidates = async (req: Request, res: Response) => {
