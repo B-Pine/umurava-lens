@@ -13,6 +13,10 @@ gaps, and send AI-drafted outreach emails — with the **recruiter always making
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)
 ![Gemini](https://img.shields.io/badge/Gemini-API-4285F4?logo=google)
 
+## 🎬 Demo Video
+
+▶️ **[Watch the full demo walkthrough](https://drive.google.com/file/d/1tbA1jRn1m9NFmg-OS9dboppyMwOXvzR2/view?usp=sharing)**
+
 ---
 
 ## Table of contents
