@@ -17,6 +17,21 @@ gaps, and send AI-drafted outreach emails — with the **recruiter always making
 
 ▶️ **[Watch the full demo walkthrough](https://drive.google.com/file/d/1tbA1jRn1m9NFmg-OS9dboppyMwOXvzR2/view?usp=sharing)**
 
+## 🌐 Live Demo
+
+**[https://umurava-lens-lucs.vercel.app](https://umurava-lens-lucs.vercel.app/)**
+
+| | |
+|---|---|
+| **Email** | `admin@umurava.africa` |
+| **Password** | `umurava-admin-2026` |
+
+> Sign in at the link above with these credentials to explore the full recruiter experience — create jobs, upload candidates, run AI screening, review shortlists, and send outreach.
+
+## 📊 Presentation Slides
+
+📎 **[View the 2-slide deck (Google Slides)](https://docs.google.com/presentation/d/11ALF1-geJ7hoIg0FhWnC4czOtBtuuMFymerusgiOuec/edit?usp=sharing)**
+
 ---
 
 ## Table of contents
@@ -26,6 +41,7 @@ gaps, and send AI-drafted outreach emails — with the **recruiter always making
 - [Tech stack](#tech-stack)
 - [Talent Profile Schema](#talent-profile-schema)
 - [AI decision flow](#ai-decision-flow)
+- [Prompt engineering](#prompt-engineering)
 - [Human-in-the-loop: outreach](#human-in-the-loop-outreach)
 - [Local setup](#local-setup)
 - [Environment variables](#environment-variables)
@@ -183,6 +199,147 @@ Per the official specification, we left all core structured fields completely un
 - **Top 10 / Top 20.** `shortlistCap` is a per-job field (spec asks for "Top 10 or 20"). The
   prompt still evaluates *every* candidate so the recruiter has full context, but only the top N
   passing candidates are flagged as `shortlisted`.
+
+---
+
+## Prompt engineering
+
+All AI logic lives in [`geminiService.ts`](backend/src/services/geminiService.ts). We use **two purpose-built prompts** — one for screening and one for CV extraction — each iterated deliberately for reliability, explainability, and recruiter trust.
+
+### Design philosophy
+
+| Principle | Implementation |
+|---|---|
+| **Determinism over creativity** | `temperature: 0.1`, `topP: 0.8`, `topK: 40` — near-deterministic output so re-runs produce consistent rankings |
+| **Structured output** | `responseMimeType: 'application/json'` forces Gemini into JSON mode; a brace-matching `extractJson()` fallback handles edge cases where the model wraps output in markdown fences |
+| **Evidence-based reasoning** | The prompt explicitly demands that every strength, gap, and email reference must tie to *concrete data* from the candidate's profile — no vague platitudes |
+| **Recruiter sovereignty** | The system prompt states: "The recruiter — not you — makes the final call. Your job is to inform it." This frames the AI as an advisor, not a decision-maker |
+| **Full transparency** | Every candidate gets a score breakdown (4 sub-scores), natural-language strengths/gaps, a confidence indicator, and a human-readable summary |
+
+### Prompt 1: Candidate screening (`screenCandidates`)
+
+**Goal:** Evaluate N candidates against a single job in one API call and produce a ranked, explainable shortlist.
+
+**Why single-prompt multi-candidate?** We evaluated two approaches:
+
+1. *One call per candidate* — simpler, but loses comparative context (the model can't see how Candidate A stacks up against Candidate B), leading to inconsistent scoring across the pool.
+2. *All candidates in one prompt* — gives the LLM the full applicant landscape. It can rank consistently, identify relative strengths, and calibrate scores. It also keeps cost and latency within a single API call for pools up to ~50 candidates.
+
+We chose **option 2**. For very large pools (100+), the recruiter can use the optional `candidateIds` filter to batch.
+
+**Prompt structure (in order):**
+
+```
+1. ROLE & FRAMING
+   → "You are an expert AI recruitment screener for Umurava Lens."
+   → Establishes the advisory (not decisional) relationship.
+
+2. JOB CONTEXT
+   → Full job spec injected: title, department, type, location,
+     salary, experience level, required skills, description.
+   → passingScore threshold (recruiter-configurable, default 70).
+
+3. RECRUITER WEIGHTS
+   → aiWeights object (technical / experience / education / impact,
+     each 0–100%) injected with explicit instruction to weight
+     scoring accordingly.
+   → This is the key customization lever: a recruiter hiring for a
+     senior role can crank experience weight to 40% while a startup
+     hiring for potential can favor project impact.
+
+4. CANDIDATE PROFILES
+   → Each candidate's full Talent Profile is serialized via
+     buildCandidateProfile(): name, headline, skills (with level +
+     years), work history (with technologies), education,
+     certifications, projects, languages, availability.
+   → Each profile is tagged with its MongoDB _id so the output
+     maps back to the database.
+
+5. EVALUATION INSTRUCTIONS (10 explicit rules)
+   → Score 0–100 with recruiter weights applied.
+   → 4 sub-scores: technicalSkillsScore, experienceScore,
+     educationScore, projectImpactScore (each 0–100).
+   → 2–4 specific strengths per candidate (must cite concrete
+     skills, companies, projects).
+   → 1–3 specific gaps/risks (actionable, evidence-based).
+   → Recommendation bucketing:
+       hire (≥85), consider (70–84), risky (<70).
+   → Confidence score (0–100) reflecting data completeness.
+   → Outreach email draft per candidate:
+       - Passing: interview invite, references 1–2 strengths,
+         4–8 sentences, signed "The Umurava Talent Team".
+       - Failing: respectful decline, no gaps listed, 3–5
+         sentences. Keeps the door open for future roles.
+
+6. OUTPUT SCHEMA
+   → Exact JSON shape enforced with field names, types, and
+     constraints. "Return ONLY valid JSON."
+   → Sort by rank ascending. Must return exactly N entries.
+```
+
+**Key iteration decisions:**
+
+- **"No vague platitudes" instruction** was added after early iterations produced generic strengths like "strong communicator" with no evidence. Adding "reference concrete skills, companies, tech stacks, or projects from their profile" dramatically improved output quality.
+- **Email tone split** — we explicitly separate passing vs. failing email instructions. Early versions produced awkward "unfortunately you didn't make it but here's why" emails that listed candidate gaps. We changed the failing template to "Do NOT list gaps or reasons — keep it graceful" for a humane candidate experience.
+- **Confidence field** — added to help recruiters gauge data quality. A candidate with a sparse 2-line resume gets a low confidence score even if the model extrapolates a decent match, signaling the recruiter should verify.
+- **Forced N-output** — "You MUST return exactly N candidate entries" prevents the model from silently dropping low-scoring candidates, ensuring full pipeline visibility.
+
+### Prompt 2: CV extraction (`extractCandidateFromCV`)
+
+**Goal:** Transform unstructured resume text (from PDF or Drive) into the exact Umurava Talent Profile Schema.
+
+**Prompt structure:**
+
+```
+1. ROLE
+   → "You are an expert Talent Acquisition AI extracting
+      structured data from a CV."
+
+2. TARGET SCHEMA
+   → The complete Talent Profile JSON shape is embedded in the
+     prompt with every field, type, and enum value specified.
+   → This acts as a contract: the model fills in what it can
+     and uses documented defaults for what it can't.
+
+3. EXTRACTION RULES
+   → Name splitting logic ("If only one token, firstName only").
+   → Skill level inference from phrasing ("expert in" → Expert,
+     "familiar with" → Beginner). Default: Intermediate.
+   → isCurrent detection from endDate keywords
+     (Present/Current/Now).
+   → Availability defaults when not inferrable.
+   → "Return empty arrays, never null" — prevents downstream
+     Mongoose validation failures.
+
+4. CV TEXT (truncated to 30,000 chars for token safety)
+```
+
+**Reliability strategies:**
+
+- **`normalizeCandidate()` post-processor** — even with strict prompting, LLMs occasionally return unexpected enum values (`"advanced"` instead of `"Advanced"`) or null arrays. The normalizer validates every field against the Mongoose schema's allowed enums and applies safe defaults. This guarantees zero insertion failures regardless of Gemini's output quirks.
+- **Exponential backoff retry** — CV extraction retries up to 3 times on HTTP 503 (overloaded) or 429 (rate-limited) responses, with delays of 2s → 4s. This handles transient Gemini API demand spikes gracefully.
+- **30K character cap** — prevents token overflow for unusually long resumes while preserving all meaningful content (most resumes are 2–5K characters).
+
+### Model selection
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| Model | `gemini-3.1-flash-lite-preview` | Optimized for speed and cost — screening calls can include 50+ candidate profiles, and flash-lite handles JSON extraction reliably at a fraction of the cost of Pro models |
+| Temperature | `0.1` | Near-zero creativity: we want consistent, reproducible rankings. Two runs on the same data should yield nearly identical results |
+| Top-P | `0.8` | Slightly constrained nucleus sampling to reduce output variance |
+| Top-K | `40` | Limits token selection pool for tighter output control |
+| Response MIME | `application/json` | Forces native JSON mode — no markdown wrapping, no preamble |
+
+### Fallback parsing (`extractJson`)
+
+Despite JSON mode, edge cases exist where Gemini wraps output in markdown fences or prepends text. Our `extractJson()` function handles this with a character-by-character brace-matching parser that:
+
+1. Strips markdown code fences if present
+2. Finds the first `{` or `[`
+3. Tracks nesting depth, string escaping, and balanced delimiters
+4. Extracts the complete JSON object
+
+This makes parsing **100% resilient** to Gemini's formatting inconsistencies without requiring a second API call.
 
 ---
 
