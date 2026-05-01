@@ -1,11 +1,19 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 
+type EmailMode = 'resend' | 'smtp' | 'ethereal';
+
+let resendClient: Resend | null = null;
 let cachedTransporter: Transporter | null = null;
-let cachedIsEthereal = false;
+let cachedMode: EmailMode | null = null;
 
-async function buildTransporter(): Promise<{ transporter: Transporter; isEthereal: boolean }> {
-  if (cachedTransporter) {
-    return { transporter: cachedTransporter, isEthereal: cachedIsEthereal };
+async function resolveDriver(): Promise<EmailMode> {
+  if (cachedMode) return cachedMode;
+
+  if (process.env.RESEND_API_KEY) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+    cachedMode = 'resend';
+    return cachedMode;
   }
 
   const host = process.env.SMTP_HOST;
@@ -20,21 +28,26 @@ async function buildTransporter(): Promise<{ transporter: Transporter; isEtherea
       secure: port === 465,
       auth: { user, pass },
     });
-    cachedIsEthereal = false;
-  } else {
-    // Dev fallback: Ethereal test inbox — returns preview URLs instead of real delivery.
-    const testAccount = await nodemailer.createTestAccount();
-    cachedTransporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: { user: testAccount.user, pass: testAccount.pass },
-    });
-    cachedIsEthereal = true;
-    console.log('[email] Using Ethereal test SMTP (no real delivery). Set SMTP_* env vars for production.');
+    cachedMode = 'smtp';
+    return cachedMode;
   }
 
-  return { transporter: cachedTransporter, isEthereal: cachedIsEthereal };
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'No email driver configured. Set RESEND_API_KEY (recommended) or SMTP_* env vars in production.'
+    );
+  }
+
+  const testAccount = await nodemailer.createTestAccount();
+  cachedTransporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: { user: testAccount.user, pass: testAccount.pass },
+  });
+  cachedMode = 'ethereal';
+  console.log('[email] Using Ethereal test SMTP (dev fallback). Set RESEND_API_KEY for real delivery.');
+  return cachedMode;
 }
 
 export interface SendEmailArgs {
@@ -52,21 +65,38 @@ export interface SendEmailResult {
 
 export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
   const { to, subject, body, fromName = 'Umurava Talent Team' } = args;
-  const { transporter, isEthereal } = await buildTransporter();
+  const mode = await resolveDriver();
 
-  const fromAddress = process.env.SMTP_FROM || '"Umurava Lens" <no-reply@umurava.africa>';
-  const from = fromName ? `"${fromName}" <${extractAddress(fromAddress)}>` : fromAddress;
+  const fromAddressRaw =
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_FROM ||
+    '"Umurava Lens" <onboarding@resend.dev>';
+  const fromEmail = extractAddress(fromAddressRaw);
+  const from = `"${fromName}" <${fromEmail}>`;
 
-  const info = await transporter.sendMail({
+  if (mode === 'resend') {
+    const { data, error } = await resendClient!.emails.send({
+      from,
+      to,
+      subject,
+      text: body,
+      html: bodyToHtml(body),
+    });
+    if (error) {
+      throw new Error(`Resend error: ${error.message || JSON.stringify(error)}`);
+    }
+    return { messageId: data?.id || '', previewUrl: null, isTestMode: false };
+  }
+
+  const info = await cachedTransporter!.sendMail({
     from,
     to,
     subject,
     text: body,
     html: bodyToHtml(body),
   });
-
-  const previewUrl = isEthereal ? (nodemailer.getTestMessageUrl(info) || null) : null;
-  return { messageId: info.messageId, previewUrl, isTestMode: isEthereal };
+  const previewUrl = mode === 'ethereal' ? (nodemailer.getTestMessageUrl(info) || null) : null;
+  return { messageId: info.messageId, previewUrl, isTestMode: mode === 'ethereal' };
 }
 
 function extractAddress(raw: string): string {
