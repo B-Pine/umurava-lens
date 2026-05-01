@@ -9,11 +9,13 @@ import {
   fetchScreeningResults,
   runScreening,
   sendOutreachBatch,
+  setInterviewDecision,
   type ScreeningResult,
+  type InterviewStatus,
 } from '../../../../store/screeningSlice';
 import OutreachPanel from '../../../../components/screening/OutreachPanel';
 
-type FilterKey = 'shortlisted' | 'top10' | 'top20' | 'score80' | 'all';
+type FilterKey = 'shortlisted' | 'interviewing' | 'top10' | 'top20' | 'score80' | 'all';
 
 export default function ShortlistPage() {
   const params = useParams();
@@ -30,6 +32,8 @@ export default function ShortlistPage() {
 
   const filtered = results.filter((r) => {
     if (filter === 'shortlisted') return r.shortlisted;
+    if (filter === 'interviewing')
+      return r.emailStatus === 'sent' && r.interviewStatus === 'pending';
     if (filter === 'top10') return r.rank <= 10;
     if (filter === 'top20') return r.rank <= 20;
     if (filter === 'score80') return r.score >= 80;
@@ -56,18 +60,44 @@ export default function ShortlistPage() {
   const shortlistedUnsent = shortlistedResults.filter((r) => r.emailStatus !== 'sent');
   const rejectedUnsent = rejectedResults.filter((r) => r.emailStatus !== 'sent');
 
-  const handleBulkSend = async (type: 'shortlisted' | 'rejected') => {
-    const targets = type === 'shortlisted' ? shortlistedUnsent : rejectedUnsent;
+  const interviewingPending = results.filter(
+    (r) => r.emailStatus === 'sent' && r.interviewStatus === 'pending'
+  );
+  const offerUnsent = results.filter(
+    (r) => r.interviewStatus === 'passed' && r.postInterviewEmailStatus !== 'sent'
+  );
+  const postInterviewDeclineUnsent = results.filter(
+    (r) =>
+      (r.interviewStatus === 'failed' || r.interviewStatus === 'no_show') &&
+      r.postInterviewEmailStatus !== 'sent'
+  );
+
+  const handleBulkSend = async (
+    type: 'shortlisted' | 'rejected' | 'offers' | 'post_interview_decline'
+  ) => {
+    const config: Record<typeof type, { targets: ScreeningResult[]; phase: 'invitation' | 'post_interview'; label: string; verb: string }> = {
+      shortlisted: { targets: shortlistedUnsent, phase: 'invitation', label: 'shortlisted', verb: 'outreach' },
+      rejected: { targets: rejectedUnsent, phase: 'invitation', label: 'rejected', verb: 'rejection' },
+      offers: { targets: offerUnsent, phase: 'post_interview', label: 'passing', verb: 'offer' },
+      post_interview_decline: {
+        targets: postInterviewDeclineUnsent,
+        phase: 'post_interview',
+        label: 'non-passing',
+        verb: 'post-interview decline',
+      },
+    };
+    const { targets, phase, label, verb } = config[type];
     if (targets.length === 0) return;
-    const label = type === 'shortlisted' ? 'shortlisted' : 'rejected';
     const confirmed = window.confirm(
-      `Send ${type === 'shortlisted' ? 'outreach' : 'rejection'} emails to ${targets.length} ${label} candidates?`
+      `Send ${verb} emails to ${targets.length} ${label} candidates?`
     );
     if (!confirmed) return;
 
     setBulkSending(true);
     try {
-      await dispatch(sendOutreachBatch(targets.map((r) => r._id))).unwrap();
+      await dispatch(
+        sendOutreachBatch({ screeningResultIds: targets.map((r) => r._id), phase })
+      ).unwrap();
       dispatch(fetchScreeningResults({ jobId }));
     } catch {
       // error handled in slice
@@ -91,6 +121,7 @@ export default function ShortlistPage() {
 
   const filters: Array<{ key: FilterKey; label: string; count?: number }> = [
     { key: 'shortlisted', label: `Shortlist (${job?.shortlistCap ?? 20})`, count: shortlistedCount },
+    { key: 'interviewing', label: 'Interviewing', count: interviewingPending.length },
     { key: 'top10', label: 'Top 10' },
     { key: 'top20', label: 'Top 20' },
     { key: 'score80', label: 'Score ≥ 80' },
@@ -139,6 +170,26 @@ export default function ShortlistPage() {
             >
               <span className="material-symbols-outlined text-[14px]">mark_email_unread</span>
               Email rejected ({rejectedUnsent.length})
+            </button>
+          )}
+          {offerUnsent.length > 0 && (
+            <button
+              onClick={() => handleBulkSend('offers')}
+              disabled={bulkSending}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-b from-emerald-500 to-emerald-600 text-white text-[11px] font-semibold shadow-[0_4px_12px_-4px_rgba(16,185,129,0.5),inset_0_1px_0_0_rgba(255,255,255,0.22)] disabled:opacity-50 transition press"
+            >
+              <span className="material-symbols-outlined text-[14px]">celebration</span>
+              Send offers ({offerUnsent.length})
+            </button>
+          )}
+          {postInterviewDeclineUnsent.length > 0 && (
+            <button
+              onClick={() => handleBulkSend('post_interview_decline')}
+              disabled={bulkSending}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-50 transition press"
+            >
+              <span className="material-symbols-outlined text-[14px]">mark_email_unread</span>
+              Post-interview decline ({postInterviewDeclineUnsent.length})
             </button>
           )}
           {canCompare && (
@@ -507,8 +558,125 @@ function CandidateDetail({
             result={result}
             variant={passed ? 'outreach' : 'rejection'}
           />
+
+          {/* Interview decision + post-interview email — only after invitation sent */}
+          {result.emailStatus === 'sent' && (
+            <InterviewDecisionSection result={result} />
+          )}
         </div>
       </div>
     </>
+  );
+}
+
+function InterviewDecisionSection({ result }: { result: ScreeningResult }) {
+  const dispatch = useAppDispatch();
+  const [saving, setSaving] = useState<InterviewStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const status = result.interviewStatus;
+  const postSent = result.postInterviewEmailStatus === 'sent';
+
+  const decide = async (decision: Exclude<InterviewStatus, 'pending'>) => {
+    if (status === decision) return;
+    if (status !== 'pending') {
+      const ok = window.confirm(
+        `Change interview outcome to "${decision.replace('_', ' ')}"? This will overwrite the current draft.`
+      );
+      if (!ok) return;
+    }
+    setSaving(decision);
+    setError(null);
+    try {
+      await dispatch(setInterviewDecision({ resultId: result._id, decision })).unwrap();
+    } catch (e: any) {
+      setError(e.message || 'Failed to save decision.');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const buttons: Array<{ key: Exclude<InterviewStatus, 'pending'>; label: string; tone: string; activeTone: string }> = [
+    {
+      key: 'passed',
+      label: 'Passed',
+      tone: 'border-slate-200 text-slate-700 hover:border-emerald-300 hover:text-emerald-700',
+      activeTone: 'border-emerald-500 bg-emerald-50 text-emerald-700',
+    },
+    {
+      key: 'failed',
+      label: "Didn't pass",
+      tone: 'border-slate-200 text-slate-700 hover:border-rose-300 hover:text-rose-700',
+      activeTone: 'border-rose-500 bg-rose-50 text-rose-700',
+    },
+    {
+      key: 'no_show',
+      label: 'No show',
+      tone: 'border-slate-200 text-slate-700 hover:border-amber-300 hover:text-amber-700',
+      activeTone: 'border-amber-500 bg-amber-50 text-amber-700',
+    },
+  ];
+
+  return (
+    <div className="bg-white/70 border border-slate-100 rounded-lg p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 flex items-center gap-1">
+          <span className="material-symbols-outlined text-[12px]">how_to_reg</span>
+          Interview Outcome
+        </p>
+        {status !== 'pending' && (
+          <span
+            className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+              status === 'passed'
+                ? 'bg-emerald-50 text-emerald-700'
+                : status === 'failed'
+                  ? 'bg-rose-50 text-rose-700'
+                  : 'bg-amber-50 text-amber-700'
+            }`}
+          >
+            {status === 'no_show' ? 'No show' : status}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {buttons.map((b) => {
+          const isActive = status === b.key;
+          const isSaving = saving === b.key;
+          return (
+            <button
+              key={b.key}
+              onClick={() => decide(b.key)}
+              disabled={postSent || saving !== null}
+              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[11px] font-semibold transition press disabled:opacity-50 ${
+                isActive ? b.activeTone : `bg-white ${b.tone}`
+              }`}
+            >
+              {isSaving && (
+                <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
+              )}
+              {b.label}
+            </button>
+          );
+        })}
+        {postSent && (
+          <span className="text-[10px] font-medium text-slate-500 self-center">
+            Decision locked — email already sent.
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-[10px] font-medium text-rose-600">{error}</p>
+      )}
+
+      {status !== 'pending' && (
+        <OutreachPanel
+          result={result}
+          phase="post_interview"
+          variant={status === 'passed' ? 'offer' : 'rejection'}
+        />
+      )}
+    </div>
   );
 }

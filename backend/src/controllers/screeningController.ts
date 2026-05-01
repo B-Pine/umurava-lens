@@ -3,6 +3,7 @@ import Job from '../models/Job';
 import Candidate from '../models/Candidate';
 import ScreeningResult from '../models/ScreeningResult';
 import { screenCandidates } from '../services/geminiService';
+import { buildPostInterviewDraft } from '../services/postInterviewTemplates';
 
 export const runScreening = async (req: Request, res: Response) => {
   try {
@@ -171,19 +172,71 @@ export const getShortlisted = async (_req: Request, res: Response) => {
 export const updateEmailDraft = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { emailDraft, emailSubject } = req.body as {
+    const { emailDraft, emailSubject, phase } = req.body as {
       emailDraft?: string;
       emailSubject?: string;
+      phase?: 'invitation' | 'post_interview';
     };
     const patch: any = {};
-    if (typeof emailDraft === 'string') patch.emailDraft = emailDraft;
-    if (typeof emailSubject === 'string') patch.emailSubject = emailSubject;
+    if (phase === 'post_interview') {
+      if (typeof emailDraft === 'string') patch.postInterviewEmailDraft = emailDraft;
+      if (typeof emailSubject === 'string') patch.postInterviewEmailSubject = emailSubject;
+    } else {
+      if (typeof emailDraft === 'string') patch.emailDraft = emailDraft;
+      if (typeof emailSubject === 'string') patch.emailSubject = emailSubject;
+    }
 
     const updated = await ScreeningResult.findByIdAndUpdate(id, patch, { new: true }).populate(
       'candidateId'
     );
     if (!updated) return res.status(404).json({ error: 'Screening result not found' });
     res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const setInterviewDecision = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { decision } = req.body as { decision?: string };
+
+    if (decision !== 'passed' && decision !== 'failed' && decision !== 'no_show') {
+      return res.status(400).json({ error: "decision must be 'passed', 'failed', or 'no_show'" });
+    }
+
+    const result = await ScreeningResult.findById(id).populate('candidateId');
+    if (!result) return res.status(404).json({ error: 'Screening result not found' });
+
+    if (result.emailStatus !== 'sent') {
+      return res
+        .status(409)
+        .json({ error: 'Interview invitation must be sent before recording an outcome.' });
+    }
+
+    if (result.postInterviewEmailStatus === 'sent') {
+      return res.status(409).json({
+        error: 'Post-interview email already sent. Decision cannot be changed after delivery.',
+      });
+    }
+
+    const candidate = result.candidateId as any;
+    const job = await Job.findById(result.jobId);
+    const draft = buildPostInterviewDraft({
+      firstName: candidate?.firstName || '',
+      jobTitle: job?.title || '',
+      decision,
+    });
+
+    result.interviewStatus = decision;
+    result.interviewDecisionAt = new Date();
+    result.postInterviewEmailSubject = draft.subject;
+    result.postInterviewEmailDraft = draft.body;
+    result.postInterviewEmailStatus = 'not_sent';
+    result.postInterviewEmailSentAt = null;
+    await result.save();
+
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

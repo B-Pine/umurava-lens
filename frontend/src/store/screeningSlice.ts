@@ -5,6 +5,8 @@ import type { Job } from './jobsSlice';
 
 export type Recommendation = 'hire' | 'consider' | 'risky';
 export type EmailStatus = 'not_sent' | 'sent' | 'failed';
+export type InterviewStatus = 'pending' | 'passed' | 'failed' | 'no_show';
+export type OutreachPhase = 'invitation' | 'post_interview';
 
 export interface ScreeningResult {
   _id: string;
@@ -26,6 +28,12 @@ export interface ScreeningResult {
   emailSubject: string;
   emailStatus: EmailStatus;
   emailSentAt: string | null;
+  interviewStatus: InterviewStatus;
+  interviewDecisionAt: string | null;
+  postInterviewEmailDraft: string;
+  postInterviewEmailSubject: string;
+  postInterviewEmailStatus: EmailStatus;
+  postInterviewEmailSentAt: string | null;
   createdAt: string;
 }
 
@@ -111,9 +119,25 @@ export const fetchShortlisted = createAsyncThunk('screening/fetchShortlisted', a
 
 export const updateEmailDraft = createAsyncThunk(
   'screening/updateEmailDraft',
-  async (payload: { resultId: string; emailDraft?: string; emailSubject?: string }) => {
+  async (payload: {
+    resultId: string;
+    emailDraft?: string;
+    emailSubject?: string;
+    phase?: OutreachPhase;
+  }) => {
     const { resultId, ...body } = payload;
     const res = await api.patch(`/screening/results/${resultId}/email`, body);
+    return res.data as ScreeningResult;
+  }
+);
+
+export const setInterviewDecision = createAsyncThunk(
+  'screening/setInterviewDecision',
+  async (payload: { resultId: string; decision: Exclude<InterviewStatus, 'pending'> }) => {
+    const res = await api.patch(
+      `/screening/results/${payload.resultId}/interview-decision`,
+      { decision: payload.decision }
+    );
     return res.data as ScreeningResult;
   }
 );
@@ -125,6 +149,7 @@ export const sendOutreachEmail = createAsyncThunk(
     to?: string;
     subject?: string;
     body?: string;
+    phase?: OutreachPhase;
   }) => {
     const res = await api.post('/outreach/send', payload);
     return res.data;
@@ -133,8 +158,8 @@ export const sendOutreachEmail = createAsyncThunk(
 
 export const sendOutreachBatch = createAsyncThunk(
   'screening/sendOutreachBatch',
-  async (screeningResultIds: string[]) => {
-    const res = await api.post('/outreach/send/batch', { screeningResultIds });
+  async (payload: { screeningResultIds: string[]; phase?: OutreachPhase }) => {
+    const res = await api.post('/outreach/send/batch', payload);
     return res.data;
   }
 );
@@ -220,13 +245,17 @@ const screeningSlice = createSlice({
         const updated = action.payload.result;
         if (updated) {
           const idx = state.results.findIndex((r) => r._id === updated._id);
-          if (idx !== -1)
-            state.results[idx] = { ...state.results[idx], emailStatus: updated.emailStatus };
+          if (idx !== -1) state.results[idx] = { ...state.results[idx], ...updated };
         }
       })
       .addCase(sendOutreachEmail.rejected, (state, action) => {
         state.sendingEmail = false;
         state.error = action.error.message || 'Email send failed';
+      })
+      .addCase(setInterviewDecision.fulfilled, (state, action) => {
+        const updated = action.payload;
+        const idx = state.results.findIndex((r) => r._id === updated._id);
+        if (idx !== -1) state.results[idx] = { ...state.results[idx], ...updated };
       });
   },
 });

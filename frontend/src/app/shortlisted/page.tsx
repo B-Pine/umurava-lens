@@ -55,7 +55,7 @@ export default function ShortlistedPage() {
     if (!confirmed) return;
     setBulkSending(true);
     try {
-      await dispatch(sendOutreachBatch(unsent.map((r) => r._id))).unwrap();
+      await dispatch(sendOutreachBatch({ screeningResultIds: unsent.map((r) => r._id) })).unwrap();
       await dispatch(fetchShortlisted());
     } catch {
       // handled in slice

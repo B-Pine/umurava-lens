@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export type Recommendation = 'hire' | 'consider' | 'risky';
 export type EmailStatus = 'not_sent' | 'sent' | 'failed';
+export type InterviewStatus = 'pending' | 'passed' | 'failed' | 'no_show';
 
 export interface IScreeningResult extends Document {
   jobId: mongoose.Types.ObjectId;
@@ -22,6 +23,12 @@ export interface IScreeningResult extends Document {
   emailSubject: string;
   emailStatus: EmailStatus;
   emailSentAt: Date | null;
+  interviewStatus: InterviewStatus;
+  interviewDecisionAt: Date | null;
+  postInterviewEmailDraft: string;
+  postInterviewEmailSubject: string;
+  postInterviewEmailStatus: EmailStatus;
+  postInterviewEmailSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +61,21 @@ const ScreeningResultSchema = new Schema<IScreeningResult>(
       default: 'not_sent',
     },
     emailSentAt: { type: Date, default: null },
+    interviewStatus: {
+      type: String,
+      enum: ['pending', 'passed', 'failed', 'no_show'],
+      default: 'pending',
+      index: true,
+    },
+    interviewDecisionAt: { type: Date, default: null },
+    postInterviewEmailDraft: { type: String, default: '' },
+    postInterviewEmailSubject: { type: String, default: '' },
+    postInterviewEmailStatus: {
+      type: String,
+      enum: ['not_sent', 'sent', 'failed'],
+      default: 'not_sent',
+    },
+    postInterviewEmailSentAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
