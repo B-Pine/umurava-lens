@@ -326,7 +326,7 @@ We chose **option 2**. For very large pools (100+), the recruiter can use the op
 
 | Parameter | Value | Rationale |
 |---|---|---|
-| Model | `gemini-3.1-flash-lite-preview` | Optimized for speed and cost — screening calls can include 50+ candidate profiles, and flash-lite handles JSON extraction reliably at a fraction of the cost of Pro models |
+| Model | `gemini-2.5-flash` | Stable (non-preview) flash tier — fast and inexpensive, handles JSON extraction across 50+ candidate profiles per screening call. Picked over preview models, which are prone to capacity-driven 503s |
 | Temperature | `0.1` | Near-zero creativity: we want consistent, reproducible rankings. Two runs on the same data should yield nearly identical results |
 | Top-P | `0.8` | Slightly constrained nucleus sampling to reduce output variance |
 | Top-K | `40` | Limits token selection pool for tighter output control |

@@ -153,7 +153,7 @@ export async function screenCandidates(
 ): Promise<ScreeningResponse> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.1-flash-lite-preview',
+    model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0.1,
       topP: 0.8,
@@ -255,7 +255,7 @@ NOTE: The top ${shortlistCap} candidates by rank will be flagged as "shortlisted
 
 export async function extractCandidateFromCV(text: string): Promise<any> {
   const model = getGeminiClient().getGenerativeModel({
-    model: 'gemini-3.1-flash-lite-preview',
+    model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0.1,
       responseMimeType: 'application/json',
